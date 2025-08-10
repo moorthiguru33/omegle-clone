@@ -10,7 +10,7 @@ function App() {
     id: null,
     gender: null,
     preferredGender: null,
-    filterCredits: 1,
+    filterCredits: 3,
     isPremium: false
   });
 
@@ -22,7 +22,6 @@ function App() {
         setUser(JSON.parse(savedUser));
       } catch (error) {
         console.error('Error parsing saved user:', error);
-        // Generate new user if parsing fails
         generateNewUser();
       }
     } else {
@@ -35,7 +34,7 @@ function App() {
       id: 'user_' + Math.random().toString(36).substring(2, 15),
       gender: null,
       preferredGender: null,
-      filterCredits: 3, // Start with 3 free credits
+      filterCredits: 3,
       isPremium: false
     };
     setUser(newUser);
