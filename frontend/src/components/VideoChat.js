@@ -26,8 +26,6 @@ const Video = styled.video`
   height: 100%;
   object-fit: cover;
   background: #000;
-  
-  /* Prevent video flickering on mobile */
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   -webkit-backface-visibility: hidden;
@@ -58,11 +56,6 @@ const Controls = styled.div`
   padding: 20px;
   background: #333;
   gap: 15px;
-  
-  @media (max-width: 768px) {
-    padding: 15px 10px;
-    gap: 10px;
-  }
 `;
 
 const Button = styled.button`
@@ -92,11 +85,6 @@ const Button = styled.button`
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
   }
-  
-  @media (max-width: 768px) {
-    padding: 10px 15px;
-    font-size: 14px;
-  }
 `;
 
 const Status = styled.div`
@@ -109,13 +97,6 @@ const Status = styled.div`
   border-radius: 8px;
   font-size: 14px;
   z-index: 10;
-  
-  @media (max-width: 768px) {
-    top: 10px;
-    left: 10px;
-    font-size: 12px;
-    padding: 8px 12px;
-  }
 `;
 
 const ChatBox = styled.div`
@@ -133,8 +114,6 @@ const ChatBox = styled.div`
   @media (max-width: 768px) {
     width: 250px;
     height: 150px;
-    bottom: 70px;
-    right: 10px;
   }
 `;
 
@@ -157,16 +136,16 @@ const MessageInput = styled.input`
   }
 `;
 
-// Helper function to force video play on mobile
+// Helper function for mobile video play
 const forceVideoPlay = (videoElement) => {
   if (videoElement && videoElement.srcObject) {
-    videoElement.play().catch(err => {
-      console.log('Video play failed:', err);
-      // Retry after user interaction
-      setTimeout(() => {
-        videoElement.play().catch(console.error);
-      }, 1000);
-    });
+    const playPromise = videoElement.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.log('Video play failed, retrying:', err);
+        setTimeout(() => videoElement.play().catch(console.error), 1000);
+      });
+    }
   }
 };
 
@@ -182,7 +161,7 @@ const VideoChat = ({ user, updateUser }) => {
   const [caller, setCaller] = useState("");
   const [callerSignal, setCallerSignal] = useState();
   const [callAccepted, setCallAccepted] = useState(false);
-  const [status, setStatus] = useState('Connecting...');
+  const [status, setStatus] = useState('Initializing...');
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isMobile, setIsMobile] = useState(false);
@@ -191,26 +170,13 @@ const VideoChat = ({ user, updateUser }) => {
   useEffect(() => {
     const checkMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     setIsMobile(checkMobile);
-    
-    // Mobile browsers need user interaction for autoplay
-    if (checkMobile) {
-      const handleFirstTouch = () => {
-        if (myVideo.current) forceVideoPlay(myVideo.current);
-        if (userVideo.current) forceVideoPlay(userVideo.current);
-      };
-      
-      document.addEventListener('touchstart', handleFirstTouch, { once: true });
-      document.addEventListener('click', handleFirstTouch, { once: true });
-      
-      return () => {
-        document.removeEventListener('touchstart', handleFirstTouch);
-        document.removeEventListener('click', handleFirstTouch);
-      };
-    }
+    console.log('Device detected as mobile:', checkMobile);
   }, []);
 
-  // Memoized callUser function with mobile optimization
-  const callUser = useCallback((id) => {
+  // Enhanced callUser with better mobile support
+  const callUser = useCallback((partnerId) => {
+    console.log('Initiating call to:', partnerId);
+    
     const peer = new Peer({
       initiator: true,
       trickle: false,
@@ -220,7 +186,11 @@ const VideoChat = ({ user, updateUser }) => {
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun.services.mozilla.com' },
-          // Add free TURN servers for mobile networks
+          {
+            urls: 'turn:relay1.expressturn.com:3478',
+            username: 'efJBIBVF6XeyWJH23A8K',
+            credential: 'nVnjF8qrBYFNjVmp'
+          },
           {
             urls: 'turn:openrelay.metered.ca:80',
             username: 'openrelayproject',
@@ -231,22 +201,29 @@ const VideoChat = ({ user, updateUser }) => {
     });
 
     peer.on('signal', (data) => {
+      console.log('Sending call signal');
       socket.current.emit('callUser', {
-        userToCall: id,
+        userToCall: partnerId,
         signalData: data,
         from: user.id
       });
     });
 
     peer.on('stream', (currentStream) => {
+      console.log('Received partner stream');
       if (userVideo.current) {
         userVideo.current.srcObject = currentStream;
-        // Force play for mobile browsers with delay
         setTimeout(() => forceVideoPlay(userVideo.current), 500);
       }
     });
 
+    peer.on('error', (err) => {
+      console.error('Peer connection error:', err);
+      setStatus('Connection failed - Trying again...');
+    });
+
     socket.current.on('callAccepted', (signal) => {
+      console.log('Call accepted, establishing connection');
       setCallAccepted(true);
       setStatus('Connected');
       peer.signal(signal);
@@ -255,122 +232,180 @@ const VideoChat = ({ user, updateUser }) => {
     connectionRef.current = peer;
   }, [stream, user.id]);
 
-  // Memoized endCall function
+  // Enhanced endCall
   const endCall = useCallback(() => {
+    console.log('Ending call');
     setCallAccepted(false);
     setReceivingCall(false);
+    
     if (connectionRef.current) {
       connectionRef.current.destroy();
+      connectionRef.current = null;
     }
+    
     if (userVideo.current) {
       userVideo.current.srcObject = null;
     }
+    
     if (socket.current) {
       socket.current.emit('endCall');
     }
   }, []);
 
+  // Main initialization effect
   useEffect(() => {
-    // Mobile-optimized media constraints
-    const constraints = {
-      video: isMobile ? {
-        width: { min: 160, ideal: 320, max: 480 },
-        height: { min: 120, ideal: 240, max: 360 },
-        frameRate: { ideal: 15, max: 24 },
-        facingMode: 'user'
-      } : {
-        width: { min: 320, ideal: 640, max: 1280 },
-        height: { min: 240, ideal: 480, max: 720 },
-        frameRate: { ideal: 30 }
-      },
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        sampleRate: isMobile ? 16000 : 44100
-      }
-    };
+    let mounted = true;
+    
+    const initializeConnection = async () => {
+      try {
+        setStatus('Getting camera access...');
+        
+        // Mobile-optimized media constraints
+        const constraints = {
+          video: isMobile ? {
+            width: { ideal: 320, max: 640 },
+            height: { ideal: 240, max: 480 },
+            frameRate: { ideal: 15, max: 24 },
+            facingMode: 'user'
+          } : {
+            width: { ideal: 640, max: 1280 },
+            height: { ideal: 480, max: 720 },
+            frameRate: { ideal: 30 }
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: isMobile ? 16000 : 44100
+          }
+        };
 
-    // Get user media with mobile-optimized settings
-    navigator.mediaDevices.getUserMedia(constraints)
-      .then((currentStream) => {
+        const currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        if (!mounted) return;
+        
         setStream(currentStream);
         if (myVideo.current) {
           myVideo.current.srcObject = currentStream;
-          // Force video to play on mobile
           if (isMobile) {
-            setTimeout(() => forceVideoPlay(myVideo.current), 100);
+            setTimeout(() => forceVideoPlay(myVideo.current), 200);
           }
         }
-      })
-      .catch((err) => {
-        console.error('Error accessing media devices:', err);
+        
+        // Initialize socket connection after media is ready
+        setStatus('Connecting to server...');
+        
+        socket.current = io('https://omegle-clone-backend-production.up.railway.app', {
+          transports: ['websocket', 'polling'],
+          timeout: 25000,
+          forceNew: true,
+          reconnection: true,
+          reconnectionDelay: 2000,
+          reconnectionAttempts: 8,
+          reconnectionDelayMax: 10000,
+          randomizationFactor: 0.3
+        });
+
+        // Enhanced socket event handlers
+        socket.current.on('connect', () => {
+          if (!mounted) return;
+          console.log('Successfully connected to server');
+          setStatus('Connected! Looking for partner...');
+          
+          // Join matching queue immediately after connection
+          setTimeout(() => {
+            if (socket.current && socket.current.connected) {
+              socket.current.emit('findPartner', {
+                userId: user.id,
+                gender: user.gender,
+                preferredGender: user.preferredGender,
+                hasFilterCredit: user.filterCredits > 0 || user.isPremium,
+                isMobile: isMobile,
+                userAgent: navigator.userAgent,
+                timestamp: Date.now()
+              });
+            }
+          }, 1000);
+        });
+
+        socket.current.on('disconnect', (reason) => {
+          if (!mounted) return;
+          console.log('Disconnected from server:', reason);
+          setStatus(`Disconnected: ${reason}`);
+          
+          // Auto-reconnect for certain disconnect reasons
+          if (reason === 'io server disconnect' || reason === 'transport close' || reason === 'transport error') {
+            setTimeout(() => {
+              if (socket.current && !socket.current.connected) {
+                console.log('Attempting to reconnect...');
+                socket.current.connect();
+              }
+            }, 3000);
+          }
+        });
+
+        socket.current.on('connect_error', (error) => {
+          if (!mounted) return;
+          console.error('Connection error:', error);
+          setStatus('Cannot connect to server - Retrying...');
+        });
+
+        socket.current.on('reconnect', (attemptNumber) => {
+          if (!mounted) return;
+          console.log('Reconnected to server after', attemptNumber, 'attempts');
+          setStatus('Reconnected! Looking for partner...');
+        });
+
+        socket.current.on('reconnect_failed', () => {
+          if (!mounted) return;
+          console.log('Failed to reconnect to server');
+          setStatus('Connection failed - Please refresh');
+        });
+
+        socket.current.on('matched', (partnerId) => {
+          if (!mounted) return;
+          console.log('Partner found:', partnerId);
+          setStatus('Partner found! Connecting...');
+          setTimeout(() => callUser(partnerId), isMobile ? 2000 : 800);
+        });
+
+        socket.current.on('waiting', () => {
+          if (!mounted) return;
+          setStatus('Looking for a partner...');
+        });
+
+        socket.current.on('partnerDisconnected', () => {
+          if (!mounted) return;
+          console.log('Partner disconnected');
+          setStatus('Partner disconnected');
+          endCall();
+        });
+
+        socket.current.on('callUser', (data) => {
+          if (!mounted) return;
+          console.log('Incoming call from:', data.from);
+          setReceivingCall(true);
+          setCaller(data.from);
+          setCallerSignal(data.signal);
+          setStatus('Incoming call...');
+        });
+
+        socket.current.on('message', (message) => {
+          if (!mounted) return;
+          setMessages(prev => [...prev, { text: message.text, sender: 'partner' }]);
+        });
+
+      } catch (err) {
+        if (!mounted) return;
+        console.error('Initialization error:', err);
         setStatus('Camera/Microphone access denied');
-      });
+      }
+    };
 
-    // Connect to signaling server
-    socket.current = io('https://omegle-clone-backend-production.up.railway.app', {
-      transports: ['websocket', 'polling'],
-      timeout: 20000,
-      forceNew: true
-    });
-    
-    socket.current.on('connect', () => {
-      console.log('Connected to server');
-      setStatus('Connected to server...');
-    });
-
-    socket.current.on('disconnect', () => {
-      console.log('Disconnected from server');
-      setStatus('Disconnected from server');
-    });
-    
-    socket.current.on('me', (id) => {
-      console.log('My ID:', id);
-    });
-
-    socket.current.on('callUser', (data) => {
-      setReceivingCall(true);
-      setCaller(data.from);
-      setCallerSignal(data.signal);
-      setStatus('Incoming call...');
-    });
-
-    socket.current.on('matched', (partnerId) => {
-      setStatus('Partner found! Connecting...');
-      // Add delay for mobile connection establishment
-      setTimeout(() => {
-        callUser(partnerId);
-      }, isMobile ? 1000 : 100);
-    });
-
-    socket.current.on('waiting', () => {
-      setStatus('Looking for a partner...');
-    });
-
-    socket.current.on('partnerDisconnected', () => {
-      setStatus('Partner disconnected');
-      endCall();
-    });
-
-    socket.current.on('message', (message) => {
-      setMessages(prev => [...prev, { text: message.text, sender: 'partner' }]);
-    });
-
-    socket.current.on('connectionTimeout', () => {
-      setStatus('Connection timeout - Try again');
-    });
-
-    // Join matching queue with mobile info
-    socket.current.emit('findPartner', {
-      userId: user.id,
-      gender: user.gender,
-      preferredGender: user.preferredGender,
-      hasFilterCredit: user.filterCredits > 0 || user.isPremium,
-      isMobile: isMobile
-    });
+    initializeConnection();
 
     return () => {
+      mounted = false;
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
@@ -378,11 +413,12 @@ const VideoChat = ({ user, updateUser }) => {
         socket.current.disconnect();
       }
     };
-  }, [user.id, user.gender, user.preferredGender, user.filterCredits, user.isPremium, callUser, endCall, isMobile]);
+  }, [user.id, user.gender, user.preferredGender, user.filterCredits, user.isPremium, isMobile, callUser, endCall]);
 
   const answerCall = () => {
+    console.log('Answering incoming call');
     setCallAccepted(true);
-    setStatus('Connected');
+    setStatus('Connecting...');
     
     const peer = new Peer({
       initiator: false,
@@ -394,9 +430,9 @@ const VideoChat = ({ user, updateUser }) => {
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun.services.mozilla.com' },
           {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
+            urls: 'turn:relay1.expressturn.com:3478',
+            username: 'efJBIBVF6XeyWJH23A8K',
+            credential: 'nVnjF8qrBYFNjVmp'
           }
         ]
       }
@@ -411,6 +447,12 @@ const VideoChat = ({ user, updateUser }) => {
         userVideo.current.srcObject = currentStream;
         setTimeout(() => forceVideoPlay(userVideo.current), 500);
       }
+      setStatus('Connected');
+    });
+
+    peer.on('error', (err) => {
+      console.error('Answer call error:', err);
+      setStatus('Connection failed');
     });
 
     peer.signal(callerSignal);
@@ -422,18 +464,20 @@ const VideoChat = ({ user, updateUser }) => {
     setStatus('Looking for next partner...');
     setMessages([]);
     
-    socket.current.emit('findPartner', {
-      userId: user.id,
-      gender: user.gender,
-      preferredGender: user.preferredGender,
-      hasFilterCredit: user.filterCredits > 0 || user.isPremium,
-      isMobile: isMobile
-    });
+    if (socket.current && socket.current.connected) {
+      socket.current.emit('findPartner', {
+        userId: user.id,
+        gender: user.gender,
+        preferredGender: user.preferredGender,
+        hasFilterCredit: user.filterCredits > 0 || user.isPremium,
+        isMobile: isMobile
+      });
+    }
   };
 
   const sendMessage = (e) => {
     e.preventDefault();
-    if (newMessage.trim() && callAccepted) {
+    if (newMessage.trim() && callAccepted && socket.current) {
       socket.current.emit('sendMessage', { text: newMessage });
       setMessages(prev => [...prev, { text: newMessage, sender: 'me' }]);
       setNewMessage('');
