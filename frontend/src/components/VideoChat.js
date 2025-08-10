@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import Peer from 'simple-peer';
@@ -121,10 +121,62 @@ const VideoChat = ({ user, updateUser }) => {
   const [caller, setCaller] = useState("");
   const [callerSignal, setCallerSignal] = useState();
   const [callAccepted, setCallAccepted] = useState(false);
-  const [callEnded, setCallEnded] = useState(false);
+  // Removed unused variable: const [callEnded, setCallEnded] = useState(false);
   const [status, setStatus] = useState('Connecting...');
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+
+  // Memoized callUser function to prevent recreation on every render
+  const callUser = useCallback((id) => {
+    const peer = new Peer({
+      initiator: true,
+      trickle: false,
+      stream: stream,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      }
+    });
+
+    peer.on('signal', (data) => {
+      socket.current.emit('callUser', {
+        userToCall: id,
+        signalData: data,
+        from: user.id
+      });
+    });
+
+    peer.on('stream', (currentStream) => {
+      if (userVideo.current) {
+        userVideo.current.srcObject = currentStream;
+      }
+    });
+
+    socket.current.on('callAccepted', (signal) => {
+      setCallAccepted(true);
+      setStatus('Connected');
+      peer.signal(signal);
+    });
+
+    connectionRef.current = peer;
+  }, [stream, user.id]);
+
+  // Memoized endCall function
+  const endCall = useCallback(() => {
+    setCallAccepted(false);
+    setReceivingCall(false);
+    if (connectionRef.current) {
+      connectionRef.current.destroy();
+    }
+    if (userVideo.current) {
+      userVideo.current.srcObject = null;
+    }
+    if (socket.current) {
+      socket.current.emit('endCall');
+    }
+  }, []);
 
   useEffect(() => {
     // Get user media
@@ -188,43 +240,7 @@ const VideoChat = ({ user, updateUser }) => {
         socket.current.disconnect();
       }
     };
-  }, []);
-
-  const callUser = (id) => {
-    const peer = new Peer({
-      initiator: true,
-      trickle: false,
-      stream: stream,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-      }
-    });
-
-    peer.on('signal', (data) => {
-      socket.current.emit('callUser', {
-        userToCall: id,
-        signalData: data,
-        from: user.id
-      });
-    });
-
-    peer.on('stream', (currentStream) => {
-      if (userVideo.current) {
-        userVideo.current.srcObject = currentStream;
-      }
-    });
-
-    socket.current.on('callAccepted', (signal) => {
-      setCallAccepted(true);
-      setStatus('Connected');
-      peer.signal(signal);
-    });
-
-    connectionRef.current = peer;
-  };
+  }, [user.id, user.gender, user.preferredGender, user.filterCredits, user.isPremium, callUser, endCall]); // Fixed: Added all dependencies
 
   const answerCall = () => {
     setCallAccepted(true);
@@ -254,19 +270,6 @@ const VideoChat = ({ user, updateUser }) => {
 
     peer.signal(callerSignal);
     connectionRef.current = peer;
-  };
-
-  const endCall = () => {
-    setCallEnded(true);
-    setCallAccepted(false);
-    setReceivingCall(false);
-    if (connectionRef.current) {
-      connectionRef.current.destroy();
-    }
-    if (userVideo.current) {
-      userVideo.current.srcObject = null;
-    }
-    socket.current.emit('endCall');
   };
 
   const findNext = () => {
