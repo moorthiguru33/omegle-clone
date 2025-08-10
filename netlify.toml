@@ -9,3 +9,16 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  REACT_APP_BACKEND_URL = "https://omegle-clone-backend-production-8f06.up.railway.app"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=self, microphone=self"
+
+[functions]
+  external_node_modules = ["simple-peer"]
