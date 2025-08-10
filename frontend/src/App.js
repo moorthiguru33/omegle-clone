@@ -22,14 +22,16 @@ function App() {
     } else {
       // Generate new user ID
       const newUser = {
-        ...user,
         id: Math.random().toString(36).substring(7),
-        filterCredits: 1
+        gender: null,
+        preferredGender: null,
+        filterCredits: 1,
+        isPremium: false
       };
       setUser(newUser);
       localStorage.setItem('omegleUser', JSON.stringify(newUser));
     }
-  }, []);
+  }, []); // Fixed: Empty dependency array is correct here
 
   const updateUser = (updatedUser) => {
     setUser(updatedUser);
