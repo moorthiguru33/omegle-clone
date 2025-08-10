@@ -16,6 +16,10 @@ const Title = styled.h1`
   font-size: 3rem;
   margin-bottom: 2rem;
   text-align: center;
+  
+  @media (max-width: 768px) {
+    font-size: 2rem;
+  }
 `;
 
 const Card = styled.div`
@@ -34,6 +38,8 @@ const Select = styled.select`
   border: none;
   border-radius: 8px;
   font-size: 16px;
+  background: white;
+  color: #333;
 `;
 
 const Button = styled.button`
@@ -46,21 +52,21 @@ const Button = styled.button`
   font-weight: bold;
   cursor: pointer;
   transition: transform 0.2s;
-
+  
   &:hover {
     transform: translateY(-2px);
   }
-
+  
   &.primary {
     background: #ff6b6b;
     color: white;
   }
-
+  
   &.secondary {
     background: #4ecdc4;
     color: white;
   }
-
+  
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -87,14 +93,14 @@ const Home = ({ user, updateUser }) => {
     }
 
     // Check if user has credits for gender filter
-    if (preferredGender && user.filterCredits <= 0 && !user.isPremium) {
+    if (preferredGender && preferredGender !== 'any' && user.filterCredits <= 0 && !user.isPremium) {
       alert('No gender filter credits remaining. Upgrade to premium or use random matching.');
       return;
     }
 
     // Use credit if gender filter is selected
     let updatedUser = { ...user, gender, preferredGender };
-    if (preferredGender && !user.isPremium && user.filterCredits > 0) {
+    if (preferredGender && preferredGender !== 'any' && !user.isPremium && user.filterCredits > 0) {
       updatedUser.filterCredits = user.filterCredits - 1;
     }
 
@@ -128,19 +134,17 @@ const Home = ({ user, updateUser }) => {
           <option value="other">Other Only</option>
         </Select>
 
-        <CreditInfo>
-          {user.isPremium ? (
-            <p>✨ Premium: Unlimited Filters</p>
-          ) : (
-            <p>🎫 Filter Credits: {user.filterCredits}</p>
-          )}
-        </CreditInfo>
+        {user.isPremium ? (
+          <CreditInfo>
+            ✨ Premium: Unlimited Filters
+          </CreditInfo>
+        ) : (
+          <CreditInfo>
+            🎫 Filter Credits: {user.filterCredits}
+          </CreditInfo>
+        )}
 
-        <Button 
-          className="primary" 
-          onClick={handleStartChat}
-          disabled={!gender}
-        >
+        <Button className="primary" onClick={handleStartChat}>
           Start Chat
         </Button>
 
