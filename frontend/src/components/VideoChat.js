@@ -27,10 +27,18 @@ const Video = styled.video`
   height: 100%;
   object-fit: cover;
   background: #000;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-playsinline: true;
+  playsinline: true;
   
   @media (max-width: 768px) {
     width: 100%;
-    height: 50vh;
+    height: 40vh;
+    max-height: 300px;
+    min-height: 200px;
   }
 `;
 
@@ -235,8 +243,29 @@ const VideoChat = ({ user, updateUser }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [skipCount, setSkipCount] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
 
-  const BACKEND_URL = 'https://omegle-clone-backend-production.up.railway.app';
+  // YOUR RAILWAY BACKEND URL
+  const BACKEND_URL = 'https://omegle-clone-backend-production-8f06.up.railway.app';
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    setIsMobile(checkMobile);
+  }, []);
+
+  // Helper function for mobile video play
+  const forceVideoPlay = (videoElement) => {
+    if (videoElement && videoElement.srcObject) {
+      const playPromise = videoElement.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.log('Video play failed, retrying:', err);
+          setTimeout(() => videoElement.play().catch(console.error), 1000);
+        });
+      }
+    }
+  };
 
   // Initialize media and socket connection
   useEffect(() => {
@@ -247,7 +276,12 @@ const VideoChat = ({ user, updateUser }) => {
         setStatus('Getting camera access...');
         
         const mediaConstraints = {
-          video: {
+          video: isMobile ? {
+            width: { ideal: 320, max: 640 },
+            height: { ideal: 240, max: 480 },
+            frameRate: { ideal: 15, max: 24 },
+            facingMode: 'user'
+          } : {
             width: { ideal: 640, max: 1280 },
             height: { ideal: 480, max: 720 },
             frameRate: { ideal: 30, max: 30 }
@@ -255,7 +289,8 @@ const VideoChat = ({ user, updateUser }) => {
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
-            autoGainControl: true
+            autoGainControl: true,
+            sampleRate: isMobile ? 16000 : 44100
           }
         };
 
@@ -266,17 +301,21 @@ const VideoChat = ({ user, updateUser }) => {
         setStream(currentStream);
         if (myVideo.current) {
           myVideo.current.srcObject = currentStream;
+          if (isMobile) {
+            setTimeout(() => forceVideoPlay(myVideo.current), 200);
+          }
         }
 
-        // Initialize socket connection
+        // Initialize socket connection with YOUR Railway URL
         setStatus('Connecting to server...');
         socket.current = io(BACKEND_URL, {
           transports: ['websocket', 'polling'],
-          timeout: 20000,
+          timeout: 25000,
           forceNew: true,
           reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000
+          reconnectionAttempts: 8,
+          reconnectionDelay: 2000,
+          reconnectionDelayMax: 10000
         });
 
         setupSocketListeners();
@@ -293,19 +332,41 @@ const VideoChat = ({ user, updateUser }) => {
         console.log('Connected to server');
         setIsConnected(true);
         setStatus('Connected! Looking for partner...');
-        findPartner();
+        
+        // Join matching queue after connection
+        setTimeout(() => {
+          if (socket.current && socket.current.connected) {
+            socket.current.emit('findPartner', {
+              userId: user.id,
+              gender: user.gender,
+              preferredGender: user.preferredGender,
+              hasFilterCredit: user.filterCredits > 0 || user.isPremium,
+              isMobile: isMobile,
+              userAgent: navigator.userAgent,
+              timestamp: Date.now()
+            });
+          }
+        }, 1000);
       });
 
-      socket.current.on('disconnect', () => {
+      socket.current.on('disconnect', (reason) => {
         if (!mounted) return;
         setIsConnected(false);
-        setStatus('Disconnected from server');
+        setStatus(`Disconnected: ${reason}`);
+        console.log('Disconnected from server:', reason);
+      });
+
+      socket.current.on('connect_error', (error) => {
+        if (!mounted) return;
+        console.error('Connection error:', error);
+        setStatus('Cannot connect to server - Retrying...');
       });
 
       socket.current.on('matched', (partnerId) => {
         if (!mounted) return;
+        console.log('Partner found:', partnerId);
         setStatus('Partner found! Connecting...');
-        callUser(partnerId);
+        setTimeout(() => callUser(partnerId), isMobile ? 2000 : 800);
       });
 
       socket.current.on('waiting', () => {
@@ -315,18 +376,22 @@ const VideoChat = ({ user, updateUser }) => {
 
       socket.current.on('callUser', (data) => {
         if (!mounted) return;
+        console.log('Incoming call from:', data.from);
         setReceivingCall(true);
         setCaller(data.from);
         setCallerSignal(data.signal);
         setStatus('Incoming call...');
-        answerCall(data.signal, data.from);
+        // Auto-answer the call
+        setTimeout(() => answerCall(data.signal, data.from), 1000);
       });
 
       socket.current.on('callAccepted', (signal) => {
         if (!mounted) return;
         setCallAccepted(true);
         setStatus('Connected to partner');
-        connectionRef.current.signal(signal);
+        if (connectionRef.current) {
+          connectionRef.current.signal(signal);
+        }
       });
 
       socket.current.on('message', (message) => {
@@ -338,6 +403,12 @@ const VideoChat = ({ user, updateUser }) => {
         if (!mounted) return;
         setStatus('Partner disconnected');
         endCall();
+      });
+
+      socket.current.on('heartbeat', () => {
+        if (socket.current && socket.current.connected) {
+          socket.current.emit('heartbeat_response');
+        }
       });
     };
 
@@ -355,9 +426,10 @@ const VideoChat = ({ user, updateUser }) => {
         connectionRef.current.destroy();
       }
     };
-  }, []);
+  }, [user.id, user.gender, user.preferredGender, user.filterCredits, user.isPremium, isMobile]);
 
   const callUser = useCallback((partnerId) => {
+    console.log('Initiating call to:', partnerId);
     const peer = new Peer({
       initiator: true,
       trickle: false,
@@ -366,6 +438,7 @@ const VideoChat = ({ user, updateUser }) => {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun.services.mozilla.com' },
           {
             urls: 'turn:openrelay.metered.ca:80',
             username: 'openrelayproject',
@@ -376,6 +449,7 @@ const VideoChat = ({ user, updateUser }) => {
     });
 
     peer.on('signal', (data) => {
+      console.log('Sending call signal');
       socket.current.emit('callUser', {
         userToCall: partnerId,
         signalData: data,
@@ -384,8 +458,10 @@ const VideoChat = ({ user, updateUser }) => {
     });
 
     peer.on('stream', (currentStream) => {
+      console.log('Received partner stream');
       if (userVideo.current) {
         userVideo.current.srcObject = currentStream;
+        setTimeout(() => forceVideoPlay(userVideo.current), 500);
       }
     });
 
@@ -394,10 +470,16 @@ const VideoChat = ({ user, updateUser }) => {
       setStatus('Connected to partner');
     });
 
+    peer.on('error', (err) => {
+      console.error('Peer connection error:', err);
+      setStatus('Connection failed - Trying again...');
+    });
+
     connectionRef.current = peer;
   }, [stream, user.id]);
 
   const answerCall = useCallback((signal, from) => {
+    console.log('Answering incoming call');
     const peer = new Peer({
       initiator: false,
       trickle: false,
@@ -405,7 +487,13 @@ const VideoChat = ({ user, updateUser }) => {
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun.services.mozilla.com' },
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
         ]
       }
     });
@@ -417,9 +505,15 @@ const VideoChat = ({ user, updateUser }) => {
     peer.on('stream', (currentStream) => {
       if (userVideo.current) {
         userVideo.current.srcObject = currentStream;
+        setTimeout(() => forceVideoPlay(userVideo.current), 500);
       }
       setCallAccepted(true);
       setStatus('Connected to partner');
+    });
+
+    peer.on('error', (err) => {
+      console.error('Answer call error:', err);
+      setStatus('Connection failed');
     });
 
     peer.signal(signal);
@@ -427,22 +521,13 @@ const VideoChat = ({ user, updateUser }) => {
     setReceivingCall(false);
   }, [stream]);
 
-  const findPartner = () => {
-    if (socket.current && socket.current.connected) {
-      socket.current.emit('findPartner', {
-        userId: user.id,
-        gender: user.gender,
-        preferredGender: user.preferredGender,
-        hasFilterCredit: user.filterCredits > 0 || user.isPremium
-      });
-    }
-  };
-
-  const endCall = () => {
+  const endCall = useCallback(() => {
+    console.log('Ending call');
     setCallAccepted(false);
     setReceivingCall(false);
     if (connectionRef.current) {
       connectionRef.current.destroy();
+      connectionRef.current = null;
     }
     if (userVideo.current) {
       userVideo.current.srcObject = null;
@@ -452,7 +537,7 @@ const VideoChat = ({ user, updateUser }) => {
     }
     setMessages([]);
     setStatus('Call ended');
-  };
+  }, []);
 
   const skipPartner = () => {
     if (skipCount >= 5 && !user.isPremium) {
@@ -463,7 +548,33 @@ const VideoChat = ({ user, updateUser }) => {
     endCall();
     setSkipCount(prev => prev + 1);
     setStatus('Looking for next partner...');
-    setTimeout(() => findPartner(), 1000);
+    setTimeout(() => {
+      if (socket.current && socket.current.connected) {
+        socket.current.emit('findPartner', {
+          userId: user.id,
+          gender: user.gender,
+          preferredGender: user.preferredGender,
+          hasFilterCredit: user.filterCredits > 0 || user.isPremium,
+          isMobile: isMobile
+        });
+      }
+    }, 1000);
+  };
+
+  const findNext = () => {
+    endCall();
+    setStatus('Looking for next partner...');
+    setTimeout(() => {
+      if (socket.current && socket.current.connected) {
+        socket.current.emit('findPartner', {
+          userId: user.id,
+          gender: user.gender,
+          preferredGender: user.preferredGender,
+          hasFilterCredit: user.filterCredits > 0 || user.isPremium,
+          isMobile: isMobile
+        });
+      }
+    }, 1000);
   };
 
   const sendMessage = (e) => {
@@ -520,7 +631,7 @@ const VideoChat = ({ user, updateUser }) => {
         <Button className="skip" onClick={skipPartner}>
           ⏭️ Skip ({5 - skipCount} left)
         </Button>
-        <Button className="next" onClick={() => { endCall(); setTimeout(findPartner, 1000); }}>
+        <Button className="next" onClick={findNext}>
           🔄 New Chat
         </Button>
       </Controls>
