@@ -53,7 +53,7 @@ const PartnerVideo = styled(Video)`
   position: relative;
   
   &::before {
-    content: ${props => props.hasStream ? '""' : '"👋 Waiting for partner..."'};
+    content: ${props => props.$hasStream ? '""' : '"👋 Waiting for partner..."'};
     position: absolute;
     top: 50%;
     left: 50%;
@@ -63,11 +63,12 @@ const PartnerVideo = styled(Video)`
     font-weight: 600;
     z-index: 1;
     text-align: center;
-    background: ${props => props.hasStream ? 'transparent' : 'linear-gradient(45deg, #2c3e50, #3498db)'};
-    padding: ${props => props.hasStream ? '0' : '20px'};
-    border-radius: ${props => props.hasStream ? '0' : '10px'};
-    width: ${props => props.hasStream ? 'auto' : '80%'};
+    background: ${props => props.$hasStream ? 'transparent' : 'linear-gradient(45deg, #2c3e50, #3498db)'};
+    padding: ${props => props.$hasStream ? '0' : '20px'};
+    border-radius: ${props => props.$hasStream ? '0' : '10px'};
+    width: ${props => props.$hasStream ? 'auto' : '80%'};
     max-width: 300px;
+    display: ${props => props.$hasStream ? 'none' : 'block'};
   }
 `;
 
@@ -191,7 +192,7 @@ const VideoChat = ({ user, updateUser }) => {
 
   // Debug logger
   const debug = (message) => {
-    console.log('[VideoChat DEBUG]', message);
+    console.log(`[VideoChat ${new Date().toLocaleTimeString()}]`, message);
   };
 
   // Enhanced getUserMedia with mobile optimization
@@ -215,93 +216,105 @@ const VideoChat = ({ user, updateUser }) => {
     };
 
     try {
-      debug('Requesting camera/microphone access...');
+      debug('📹 Requesting camera/microphone access...');
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       
       // Ensure all tracks are enabled
       mediaStream.getTracks().forEach(track => {
         track.enabled = true;
-        debug(`Track enabled: ${track.kind} - ${track.label}`);
+        debug(`✅ Track enabled: ${track.kind} - ${track.label}`);
       });
       
-      debug(`Media stream obtained - Video: ${mediaStream.getVideoTracks().length}, Audio: ${mediaStream.getAudioTracks().length}`);
+      debug(`✅ Media stream obtained - Video: ${mediaStream.getVideoTracks().length}, Audio: ${mediaStream.getAudioTracks().length}`);
       return mediaStream;
     } catch (err) {
-      debug(`Media access failed: ${err.message}`);
+      debug(`❌ Media access failed: ${err.message}`);
       throw new Error(`Camera/Microphone access denied: ${err.message}`);
     }
   };
 
-  // Fixed video play function with multiple fallbacks
+  // CRITICAL FIX: Proper video setup with user interaction handling
   const setupVideo = async (videoElement, stream, type = 'unknown') => {
     if (!videoElement || !stream) {
-      debug(`Video setup failed - missing element or stream for ${type}`);
+      debug(`❌ Video setup failed - missing element or stream for ${type}`);
       return false;
     }
     
     try {
-      debug(`Setting up ${type} video...`);
+      debug(`🎬 Setting up ${type} video...`);
       
       // Clear any existing stream first
       if (videoElement.srcObject) {
-        videoElement.srcObject.getTracks().forEach(track => track.stop());
+        const existingTracks = videoElement.srcObject.getTracks();
+        existingTracks.forEach(track => track.stop());
+        videoElement.srcObject = null;
       }
       
       // Set the stream
       videoElement.srcObject = stream;
       
-      // Configure video element properties
+      // CRITICAL: Configure video element properties
       videoElement.playsInline = true;
       videoElement.autoplay = true;
       videoElement.controls = false;
       videoElement.muted = type === 'local'; // Only mute local video to prevent feedback
+      videoElement.volume = type === 'partner' ? 1.0 : 0.0; // Ensure partner audio is audible
       
       // Set essential attributes for mobile
       videoElement.setAttribute('playsinline', 'true');
       videoElement.setAttribute('webkit-playsinline', 'true');
       videoElement.setAttribute('autoplay', 'true');
       
-      // Wait for metadata to load
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Metadata timeout')), 5000);
-        
-        videoElement.onloadedmetadata = () => {
-          clearTimeout(timeout);
-          debug(`${type} video metadata loaded`);
-          resolve();
+      // CRITICAL FIX: Wait for loadedmetadata event
+      return new Promise((resolve) => {
+        const handleMetadata = async () => {
+          debug(`📊 ${type} video metadata loaded`);
+          
+          // Try to play the video
+          try {
+            await videoElement.play();
+            debug(`▶️ ${type} video playing successfully`);
+            resolve(true);
+          } catch (playErr) {
+            debug(`⚠️ ${type} video play error (may require user interaction): ${playErr.message}`);
+            
+            // For partner video, try to play on first user interaction
+            if (type === 'partner') {
+              const playOnInteraction = async () => {
+                try {
+                  await videoElement.play();
+                  debug(`▶️ ${type} video playing after user interaction`);
+                  document.removeEventListener('click', playOnInteraction);
+                  document.removeEventListener('touchstart', playOnInteraction);
+                } catch (err) {
+                  debug(`❌ ${type} video still failed to play: ${err.message}`);
+                }
+              };
+              
+              document.addEventListener('click', playOnInteraction, { once: true });
+              document.addEventListener('touchstart', playOnInteraction, { once: true });
+            }
+            
+            resolve(true); // Consider it successful even if autoplay failed
+          }
         };
         
-        videoElement.onerror = (err) => {
-          clearTimeout(timeout);
-          reject(err);
-        };
+        if (videoElement.readyState >= 1) {
+          // Metadata already loaded
+          handleMetadata();
+        } else {
+          videoElement.addEventListener('loadedmetadata', handleMetadata, { once: true });
+          
+          // Fallback timeout
+          setTimeout(() => {
+            debug(`⏰ ${type} video metadata timeout`);
+            resolve(false);
+          }, 5000);
+        }
       });
       
-      // Attempt to play with multiple retries
-      for (let i = 0; i < 3; i++) {
-        try {
-          await videoElement.play();
-          debug(`${type} video playing successfully`);
-          return true;
-        } catch (playErr) {
-          debug(`${type} video play attempt ${i + 1} failed: ${playErr.message}`);
-          
-          if (playErr.name === 'NotAllowedError') {
-            // User interaction required
-            debug(`${type} video requires user interaction`);
-            break;
-          }
-          
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-      
-      debug(`${type} video setup completed with potential play issues`);
-      return true;
-      
     } catch (err) {
-      debug(`${type} video setup failed completely: ${err.message}`);
+      debug(`❌ ${type} video setup failed completely: ${err.message}`);
       return false;
     }
   };
@@ -333,9 +346,9 @@ const VideoChat = ({ user, updateUser }) => {
     rtcpMuxPolicy: 'require'
   });
 
-  // Enhanced peer creation with better stream handling
+  // CRITICAL FIX: Enhanced peer creation with proper stream handling
   const createPeer = (initiator, localStream) => {
-    debug(`Creating peer - initiator: ${initiator}`);
+    debug(`🤝 Creating peer - initiator: ${initiator}`);
     
     const peer = new Peer({
       initiator,
@@ -349,23 +362,26 @@ const VideoChat = ({ user, updateUser }) => {
       }
     });
 
-    // Enhanced stream handling
+    // CRITICAL: Enhanced stream handling with proper setup
     peer.on('stream', async (remoteStream) => {
-      debug(`🎥 Received remote stream with ${remoteStream.getTracks().length} tracks`);
+      debug(`🎥 REMOTE STREAM RECEIVED with ${remoteStream.getTracks().length} tracks`);
       
-      // Log track details
-      remoteStream.getTracks().forEach(track => {
-        debug(`Remote track: ${track.kind} - ${track.label} - enabled: ${track.enabled}`);
+      // Log detailed track information
+      remoteStream.getTracks().forEach((track, index) => {
+        debug(`📡 Remote Track ${index + 1}: ${track.kind} - ${track.label} - enabled: ${track.enabled} - readyState: ${track.readyState}`);
       });
       
-      // Set partner stream state
+      // CRITICAL: Set partner stream state IMMEDIATELY
       setPartnerStream(remoteStream);
       
-      // Setup partner video with retry logic
+      // CRITICAL: Setup partner video with immediate execution
       if (partnerVideo.current) {
+        debug('🎬 Setting up partner video element...');
+        
         const success = await setupVideo(partnerVideo.current, remoteStream, 'partner');
+        
         if (success) {
-          debug('✅ Partner video setup successful');
+          debug('✅ Partner video setup successful - YOU SHOULD SEE PARTNER NOW!');
           setStatus('🎥 Connected - You can see each other!');
         } else {
           debug('❌ Partner video setup failed');
@@ -373,16 +389,18 @@ const VideoChat = ({ user, updateUser }) => {
         }
       } else {
         debug('❌ Partner video element not available');
+        setStatus('❌ Partner video element not found');
       }
     });
 
+    // Enhanced connection state monitoring
     peer.on('connect', () => {
-      debug('✅ Peer connection established');
+      debug('✅ Peer connection established (data channel)');
       setCallAccepted(true);
     });
 
     peer.on('error', (err) => {
-      debug(`❌ Peer error: ${err.message}`);
+      debug(`❌ Peer error: ${err.type || 'unknown'} - ${err.message}`);
       setStatus('❌ Connection failed. Finding new partner...');
       setTimeout(() => findPartner(), 3000);
     });
@@ -391,6 +409,19 @@ const VideoChat = ({ user, updateUser }) => {
       debug('🔌 Peer connection closed');
       setStatus('👋 Partner disconnected');
     });
+
+    // Monitor ICE connection state
+    if (peer._pc) {
+      peer._pc.oniceconnectionstatechange = () => {
+        debug(`🧊 ICE connection state: ${peer._pc.iceConnectionState}`);
+        if (peer._pc.iceConnectionState === 'connected') {
+          debug('🎉 ICE connection established successfully!');
+        } else if (peer._pc.iceConnectionState === 'failed') {
+          debug('💔 ICE connection failed');
+          setStatus('❌ Connection failed due to network issues');
+        }
+      };
+    }
 
     return peer;
   };
@@ -402,7 +433,7 @@ const VideoChat = ({ user, updateUser }) => {
     const initializeChat = async () => {
       try {
         setStatus('🎥 Getting camera access...');
-        debug('Starting initialization...');
+        debug('🚀 Starting initialization...');
 
         // Get user media first
         const currentStream = await getUserMedia();
@@ -417,7 +448,7 @@ const VideoChat = ({ user, updateUser }) => {
 
         // Initialize socket connection
         setStatus('🔌 Connecting to server...');
-        debug('Connecting to backend...');
+        debug('🌐 Connecting to backend...');
 
         socket.current = io(BACKEND_URL, {
           transports: ['websocket', 'polling'],
@@ -431,9 +462,9 @@ const VideoChat = ({ user, updateUser }) => {
         setupSocketListeners();
 
       } catch (err) {
-        console.error('Initialization error:', err);
+        console.error('❌ Initialization error:', err);
         setStatus('❌ Camera/Microphone access denied. Please allow access and refresh.');
-        debug(`Initialization failed: ${err.message}`);
+        debug(`💥 Initialization failed: ${err.message}`);
       }
     };
 
@@ -623,7 +654,7 @@ const VideoChat = ({ user, updateUser }) => {
           ref={partnerVideo} 
           autoPlay 
           playsInline 
-          hasStream={!!partnerStream}
+          $hasStream={!!partnerStream}
         />
       </VideoContainer>
 
