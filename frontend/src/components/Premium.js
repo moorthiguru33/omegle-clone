@@ -33,10 +33,12 @@ const PriceTag = styled.div`
 const FeatureList = styled.ul`
   text-align: left;
   margin: 20px 0;
+  
   li {
     margin: 10px 0;
     padding-left: 20px;
     position: relative;
+    
     &:before {
       content: '✨';
       position: absolute;
@@ -55,16 +57,16 @@ const Button = styled.button`
   font-weight: bold;
   cursor: pointer;
   transition: transform 0.2s;
-
+  
   &:hover {
     transform: translateY(-2px);
   }
-
+  
   &.premium {
     background: #ffd700;
     color: #333;
   }
-
+  
   &.back {
     background: #6c757d;
     color: white;
@@ -78,41 +80,17 @@ const Premium = ({ user, updateUser }) => {
   const handlePurchase = async () => {
     setLoading(true);
     
-    // Simulate Razorpay payment
-    const options = {
-      key: 'rzp_test_your_key', // Replace with your Razorpay key
-      amount: 50000, // 500 INR in paisa
-      currency: 'INR',
-      name: 'Omegle Clone Premium',
-      description: 'Monthly Premium Subscription',
-      handler: function (response) {
-        // Payment successful
-        const updatedUser = {
-          ...user,
-          isPremium: true,
-          filterCredits: 999,
-          subscriptionId: response.razorpay_payment_id
-        };
-        updateUser(updatedUser);
-        alert('Premium activated successfully!');
-        navigate('/');
-      },
-      prefill: {
-        email: 'user@example.com',
-        contact: '9999999999'
-      },
-      theme: {
-        color: '#667eea'
-      }
-    };
-
-    // In a real implementation, you would load Razorpay script and create payment
-    // For demo purposes, we'll simulate the payment
+    // Simulate payment process
     setTimeout(() => {
-      const mockResponse = {
-        razorpay_payment_id: 'pay_' + Math.random().toString(36).substring(7)
+      const updatedUser = {
+        ...user,
+        isPremium: true,
+        filterCredits: 999,
+        subscriptionId: 'premium_' + Math.random().toString(36).substring(7)
       };
-      options.handler(mockResponse);
+      updateUser(updatedUser);
+      alert('Premium activated successfully!');
+      navigate('/');
       setLoading(false);
     }, 2000);
   };
@@ -123,12 +101,14 @@ const Premium = ({ user, updateUser }) => {
         <Card>
           <h1>✨ Premium Active</h1>
           <p>You already have premium subscription!</p>
+          
           <FeatureList>
             <li>Unlimited gender filtering</li>
             <li>Priority matching</li>
             <li>HD video quality</li>
             <li>Ad-free experience</li>
           </FeatureList>
+
           <Button className="back" onClick={() => navigate('/')}>
             Back to Home
           </Button>
@@ -163,8 +143,8 @@ const Premium = ({ user, updateUser }) => {
         <Button className="back" onClick={() => navigate('/')}>
           Maybe Later
         </Button>
-        
-        <p style={{fontSize: '12px', opacity: 0.8, marginTop: '20px'}}>
+
+        <p style={{ fontSize: '12px', marginTop: '20px', opacity: 0.8 }}>
           Secure payment powered by Razorpay. Cancel anytime.
         </p>
       </Card>
