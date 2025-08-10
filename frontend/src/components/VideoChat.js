@@ -121,7 +121,6 @@ const VideoChat = ({ user, updateUser }) => {
   const [caller, setCaller] = useState("");
   const [callerSignal, setCallerSignal] = useState();
   const [callAccepted, setCallAccepted] = useState(false);
-  // Removed unused variable: const [callEnded, setCallEnded] = useState(false);
   const [status, setStatus] = useState('Connecting...');
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -192,8 +191,8 @@ const VideoChat = ({ user, updateUser }) => {
         setStatus('Camera/Microphone access denied');
       });
 
-    // Connect to signaling server
-    socket.current = io('http://localhost:5000'); // Replace with your backend URL
+    // Connect to signaling server - UPDATED WITH YOUR RAILWAY URL
+    socket.current = io('https://omegle-clone-backend-production.up.railway.app');
     
     socket.current.on('me', (id) => {
       console.log('My ID:', id);
@@ -240,7 +239,7 @@ const VideoChat = ({ user, updateUser }) => {
         socket.current.disconnect();
       }
     };
-  }, [user.id, user.gender, user.preferredGender, user.filterCredits, user.isPremium, callUser, endCall]); // Fixed: Added all dependencies
+  }, [user.id, user.gender, user.preferredGender, user.filterCredits, user.isPremium, callUser, endCall]);
 
   const answerCall = () => {
     setCallAccepted(true);
