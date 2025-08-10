@@ -8,21 +8,90 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: #1a1a1a;
   color: #333;
+  overflow-x: hidden;
 }
 
 .App {
   text-align: center;
 }
 
-/* Responsive Design */
+/* Mobile-specific video optimizations */
+video {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  webkit-playsinline: true;
+  playsinline: true;
+  /* Fix for mobile video autoplay */
+  -webkit-playsinline: true;
+}
+
+/* Responsive Design for Mobile */
 @media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+  
   .video-container {
-    flex-direction: column;
+    flex-direction: column !important;
   }
   
   .video-container video {
     width: 100% !important;
-    height: 50% !important;
+    height: 40vh !important;
+    max-height: 300px;
+    min-height: 200px;
+  }
+  
+  /* Mobile button optimizations */
+  button {
+    min-height: 44px; /* iOS touch target minimum */
+    -webkit-appearance: none;
+    border-radius: 8px;
+  }
+  
+  /* Mobile input optimizations */
+  input {
+    -webkit-appearance: none;
+    border-radius: 8px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  /* Mobile select optimizations */
+  select {
+    -webkit-appearance: none;
+    border-radius: 8px;
+    font-size: 16px;
+  }
+}
+
+/* Tablet specific */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .video-container video {
+    width: 50% !important;
+    height: 60vh !important;
+  }
+}
+
+/* Very small mobile screens */
+@media (max-width: 480px) {
+  .video-container video {
+    height: 35vh !important;
+    max-height: 250px;
+  }
+  
+  /* Smaller chat box on mobile */
+  .chat-box {
+    width: 90% !important;
+    right: 5% !important;
+    height: 120px !important;
+  }
+  
+  /* Smaller controls on mobile */
+  .controls button {
+    padding: 8px 12px !important;
+    font-size: 12px !important;
   }
 }
 
@@ -36,9 +105,9 @@ body {
   animation: fadeIn 0.5s ease-in;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar for mobile */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -47,9 +116,86 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: #888;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* Fix for mobile Safari video issues */
+@supports (-webkit-overflow-scrolling: touch) {
+  video {
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Prevent mobile zoom on inputs */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  select,
+  textarea,
+  input[type="text"],
+  input[type="password"],
+  input[type="datetime"],
+  input[type="datetime-local"],
+  input[type="date"],
+  input[type="month"],
+  input[type="time"],
+  input[type="week"],
+  input[type="number"],
+  input[type="email"],
+  input[type="url"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="color"] {
+    font-size: 16px;
+  }
+}
+
+/* Landscape mobile optimization */
+@media (max-height: 500px) and (orientation: landscape) {
+  .video-container {
+    flex-direction: row !important;
+  }
+  
+  .video-container video {
+    width: 50% !important;
+    height: 70vh !important;
+  }
+  
+  .controls {
+    padding: 10px !important;
+  }
+}
+
+/* Loading states */
+.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Connection status colors */
+.status-connecting {
+  background: rgba(255, 193, 7, 0.8) !important;
+}
+
+.status-connected {
+  background: rgba(40, 167, 69, 0.8) !important;
+}
+
+.status-disconnected {
+  background: rgba(220, 53, 69, 0.8) !important;
+}
+
+.status-waiting {
+  background: rgba(23, 162, 184, 0.8) !important;
+}
+
+/* High DPI display optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  video {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
 }
