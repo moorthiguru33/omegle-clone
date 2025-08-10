@@ -1,75 +1,75 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
-import Peer from 'simple-peer';
 import styled from 'styled-components';
 
 const Container = styled.div`
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   position: relative;
   overflow: hidden;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 `;
 
 const VideoContainer = styled.div`
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   flex: 1;
-  position: relative;
   gap: 2px;
+  padding: 10px;
   
   @media (max-width: 768px) {
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
   }
+`;
+
+const VideoWrapper = styled.div`
+  position: relative;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 `;
 
 const Video = styled.video`
-  width: 50%;
+  width: 100%;
   height: 100%;
   object-fit: cover;
-  background: #000;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-  
-  @media (max-width: 768px) {
-    width: 100%;
-    height: 50vh;
-    border-radius: 0;
-  }
+  border-radius: 12px;
 `;
 
-const MyVideo = styled(Video)`
-  border-right: 2px solid rgba(255,255,255,0.1);
-  
-  @media (max-width: 768px) {
-    border-right: none;
-    border-bottom: 2px solid rgba(255,255,255,0.1);
-  }
+const VideoLabel = styled.div`
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
 `;
 
-const PartnerVideo = styled(Video)`
-  position: relative;
-  
-  &::before {
-    content: ${props => props.$hasStream ? '""' : '"👋 Waiting for partner..."'};
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #fff;
-    font-size: 18px;
-    font-weight: 600;
-    z-index: 1;
-    text-align: center;
-    background: ${props => props.$hasStream ? 'transparent' : 'linear-gradient(45deg, #2c3e50, #3498db)'};
-    padding: ${props => props.$hasStream ? '0' : '20px'};
-    border-radius: ${props => props.$hasStream ? '0' : '10px'};
-    width: ${props => props.$hasStream ? 'auto' : '80%'};
-    max-width: 300px;
-    display: ${props => props.$hasStream ? 'none' : 'block'};
-  }
+const ConnectionStatus = styled.div`
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: ${props => {
+    if (props.status === 'connected') return 'rgba(34, 197, 94, 0.9)';
+    if (props.status === 'connecting') return 'rgba(251, 191, 36, 0.9)';
+    return 'rgba(239, 68, 68, 0.9)';
+  }};
+  color: white;
+  padding: 8px 16px;
+  border-radius: 25px;
+  font-size: 14px;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+  z-index: 1000;
 `;
 
 const Controls = styled.div`
@@ -77,70 +77,74 @@ const Controls = styled.div`
   justify-content: center;
   align-items: center;
   padding: 20px;
-  background: rgba(255,255,255,0.1);
-  backdrop-filter: blur(10px);
-  gap: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 16px;
   flex-wrap: wrap;
-  border-top: 1px solid rgba(255,255,255,0.2);
 `;
 
-const Button = styled.button`
-  padding: 12px 24px;
+const ControlButton = styled.button`
+  width: 56px;
+  height: 56px;
   border: none;
-  border-radius: 50px;
-  font-size: 14px;
-  font-weight: 600;
+  border-radius: 50%;
+  font-size: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
-  min-width: 120px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
   
-  &.stop {
-    background: linear-gradient(45deg, #e74c3c, #c0392b);
+  &.primary {
+    background: linear-gradient(45deg, #ef4444, #dc2626);
     color: white;
-    box-shadow: 0 4px 15px rgba(231,76,60,0.3);
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
     
-    &:hover { 
+    &:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(231,76,60,0.4);
+      box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
     }
   }
-
-  &.next {
-    background: linear-gradient(45deg, #27ae60, #2ecc71);
+  
+  &.secondary {
+    background: linear-gradient(45deg, #10b981, #059669);
     color: white;
-    box-shadow: 0 4px 15px rgba(39,174,96,0.3);
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
     
-    &:hover { 
+    &:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(39,174,96,0.4);
+      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
     }
   }
-
-  &.home {
-    background: linear-gradient(45deg, #95a5a6, #34495e);
-    color: white;
-    box-shadow: 0 4px 15px rgba(149,165,166,0.3);
-    
-    &:hover { 
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(149,165,166,0.4);
-    }
-  }
-
+  
   &.control {
-    background: linear-gradient(45deg, #f39c12, #e67e22);
+    background: ${props => props.active 
+      ? 'linear-gradient(45deg, #6366f1, #4f46e5)' 
+      : 'rgba(255, 255, 255, 0.2)'};
     color: white;
-    box-shadow: 0 4px 15px rgba(243,156,18,0.3);
-    min-width: 60px;
+    border: 2px solid ${props => props.active ? '#6366f1' : 'rgba(255, 255, 255, 0.3)'};
     
-    &:hover { 
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(243,156,18,0.4);
+    &:hover {
+      background: ${props => props.active 
+        ? 'linear-gradient(45deg, #4f46e5, #4338ca)' 
+        : 'rgba(255, 255, 255, 0.3)'};
+      transform: translateY(-1px);
     }
   }
-
+  
+  &.home {
+    background: rgba(107, 114, 128, 0.8);
+    color: white;
+    border: 2px solid rgba(107, 114, 128, 0.6);
+    
+    &:hover {
+      background: rgba(75, 85, 99, 0.9);
+      transform: translateY(-1px);
+    }
+  }
+  
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -148,552 +152,518 @@ const Button = styled.button`
   }
 `;
 
-const Status = styled.div`
+const PlaceholderMessage = styled.div`
   position: absolute;
-  top: 20px;
-  left: 20px;
-  background: ${props => {
-    if (props.status.includes('Connected') || props.status.includes('partner')) return 'rgba(39, 174, 96, 0.9)';
-    if (props.status.includes('Looking') || props.status.includes('Connecting')) return 'rgba(241, 196, 15, 0.9)';
-    if (props.status.includes('failed') || props.status.includes('Error')) return 'rgba(231, 76, 60, 0.9)';
-    return 'rgba(52, 73, 94, 0.9)';
-  }};
-  color: white;
-  padding: 12px 20px;
-  border-radius: 25px;
-  font-size: 14px;
-  font-weight: 600;
-  z-index: 1000;
-  max-width: 300px;
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255,255,255,0.2);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 18px;
+  font-weight: 500;
 `;
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://omegle-clone-backend-production-8f06.up.railway.app';
+
+// Enhanced ICE servers configuration
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
+  // Free TURN servers (replace with your own for production)
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject', 
+    credential: 'openrelayproject'
+  }
+];
 
 const VideoChat = ({ user, updateUser }) => {
   const navigate = useNavigate();
-  const myVideo = useRef();
-  const partnerVideo = useRef();
-  const connectionRef = useRef();
-  const socket = useRef();
+  const localVideoRef = useRef();
+  const remoteVideoRef = useRef();
+  const socketRef = useRef();
+  const peerConnectionRef = useRef();
   
-  const [stream, setStream] = useState();
-  const [partnerStream, setPartnerStream] = useState();
-  const [receivingCall, setReceivingCall] = useState(false);
-  const [caller, setCaller] = useState("");
-  const [callerSignal, setCallerSignal] = useState();
-  const [callAccepted, setCallAccepted] = useState(false);
-  const [status, setStatus] = useState('Initializing...');
-  const [isConnected, setIsConnected] = useState(false);
+  const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState('initializing');
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
-
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://omegle-clone-backend-production-8f06.up.railway.app';
-
-  // Debug logger
-  const debug = (message) => {
-    console.log(`[VideoChat ${new Date().toLocaleTimeString()}]`, message);
-  };
-
-  // Enhanced getUserMedia with mobile optimization
-  const getUserMedia = async () => {
-    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
+  const [isConnecting, setIsConnecting] = useState(false);
+  
+  // Enhanced getUserMedia with better mobile support
+  const getUserMedia = useCallback(async () => {
     const constraints = {
       video: {
-        width: isMobile ? { min: 320, ideal: 480, max: 640 } : { min: 480, ideal: 720, max: 1280 },
-        height: isMobile ? { min: 240, ideal: 360, max: 480 } : { min: 360, ideal: 480, max: 720 },
+        width: { min: 320, ideal: 720, max: 1280 },
+        height: { min: 240, ideal: 480, max: 720 },
         frameRate: { min: 15, ideal: 24, max: 30 },
-        facingMode: { ideal: 'user' }
+        facingMode: 'user'
       },
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
-        sampleRate: 44100,
-        channelCount: 1
+        sampleRate: 44100
       }
     };
-
-    try {
-      debug('📹 Requesting camera/microphone access...');
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      // Ensure all tracks are enabled
-      mediaStream.getTracks().forEach(track => {
-        track.enabled = true;
-        debug(`✅ Track enabled: ${track.kind} - ${track.label}`);
-      });
-      
-      debug(`✅ Media stream obtained - Video: ${mediaStream.getVideoTracks().length}, Audio: ${mediaStream.getAudioTracks().length}`);
-      return mediaStream;
-    } catch (err) {
-      debug(`❌ Media access failed: ${err.message}`);
-      throw new Error(`Camera/Microphone access denied: ${err.message}`);
-    }
-  };
-
-  // CRITICAL FIX: Proper video setup with user interaction handling
-  const setupVideo = async (videoElement, stream, type = 'unknown') => {
-    if (!videoElement || !stream) {
-      debug(`❌ Video setup failed - missing element or stream for ${type}`);
-      return false;
-    }
     
     try {
-      debug(`🎬 Setting up ${type} video...`);
+      console.log('🎥 Requesting media access...');
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      setLocalStream(stream);
       
-      // Clear any existing stream first
-      if (videoElement.srcObject) {
-        const existingTracks = videoElement.srcObject.getTracks();
-        existingTracks.forEach(track => track.stop());
-        videoElement.srcObject = null;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
       }
       
-      // Set the stream
-      videoElement.srcObject = stream;
+      return stream;
+    } catch (error) {
+      console.error('❌ Media access failed:', error);
       
-      // CRITICAL: Configure video element properties
-      videoElement.playsInline = true;
-      videoElement.autoplay = true;
-      videoElement.controls = false;
-      videoElement.muted = type === 'local'; // Only mute local video to prevent feedback
-      videoElement.volume = type === 'partner' ? 1.0 : 0.0; // Ensure partner audio is audible
-      
-      // Set essential attributes for mobile
-      videoElement.setAttribute('playsinline', 'true');
-      videoElement.setAttribute('webkit-playsinline', 'true');
-      videoElement.setAttribute('autoplay', 'true');
-      
-      // CRITICAL FIX: Wait for loadedmetadata event
-      return new Promise((resolve) => {
-        const handleMetadata = async () => {
-          debug(`📊 ${type} video metadata loaded`);
-          
-          // Try to play the video
-          try {
-            await videoElement.play();
-            debug(`▶️ ${type} video playing successfully`);
-            resolve(true);
-          } catch (playErr) {
-            debug(`⚠️ ${type} video play error (may require user interaction): ${playErr.message}`);
-            
-            // For partner video, try to play on first user interaction
-            if (type === 'partner') {
-              const playOnInteraction = async () => {
-                try {
-                  await videoElement.play();
-                  debug(`▶️ ${type} video playing after user interaction`);
-                  document.removeEventListener('click', playOnInteraction);
-                  document.removeEventListener('touchstart', playOnInteraction);
-                } catch (err) {
-                  debug(`❌ ${type} video still failed to play: ${err.message}`);
-                }
-              };
-              
-              document.addEventListener('click', playOnInteraction, { once: true });
-              document.addEventListener('touchstart', playOnInteraction, { once: true });
-            }
-            
-            resolve(true); // Consider it successful even if autoplay failed
-          }
-        };
-        
-        if (videoElement.readyState >= 1) {
-          // Metadata already loaded
-          handleMetadata();
-        } else {
-          videoElement.addEventListener('loadedmetadata', handleMetadata, { once: true });
-          
-          // Fallback timeout
-          setTimeout(() => {
-            debug(`⏰ ${type} video metadata timeout`);
-            resolve(false);
-          }, 5000);
-        }
-      });
-      
-    } catch (err) {
-      debug(`❌ ${type} video setup failed completely: ${err.message}`);
-      return false;
-    }
-  };
-
-  // Enhanced peer configuration with better TURN servers
-  const getPeerConfig = () => ({
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun.relay.metered.ca:80' },
-      {
-        urls: 'turn:a.relay.metered.ca:80',
-        username: 'a40c231adf24f7f89414c5be',
-        credential: 'o+bz7wkBa2Cxr+n2'
-      },
-      {
-        urls: 'turn:a.relay.metered.ca:80?transport=tcp',
-        username: 'a40c231adf24f7f89414c5be',
-        credential: 'o+bz7wkBa2Cxr+n2'
-      },
-      {
-        urls: 'turn:a.relay.metered.ca:443',
-        username: 'a40c231adf24f7f89414c5be',
-        credential: 'o+bz7wkBa2Cxr+n2'
-      }
-    ],
-    iceCandidatePoolSize: 10,
-    bundlePolicy: 'max-bundle',
-    rtcpMuxPolicy: 'require'
-  });
-
-  // CRITICAL FIX: Enhanced peer creation with proper stream handling
-  const createPeer = (initiator, localStream) => {
-    debug(`🤝 Creating peer - initiator: ${initiator}`);
-    
-    const peer = new Peer({
-      initiator,
-      trickle: false,
-      stream: localStream,
-      config: getPeerConfig(),
-      offerOptions: {
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true,
-        voiceActivityDetection: false
-      }
-    });
-
-    // CRITICAL: Enhanced stream handling with proper setup
-    peer.on('stream', async (remoteStream) => {
-      debug(`🎥 REMOTE STREAM RECEIVED with ${remoteStream.getTracks().length} tracks`);
-      
-      // Log detailed track information
-      remoteStream.getTracks().forEach((track, index) => {
-        debug(`📡 Remote Track ${index + 1}: ${track.kind} - ${track.label} - enabled: ${track.enabled} - readyState: ${track.readyState}`);
-      });
-      
-      // CRITICAL: Set partner stream state IMMEDIATELY
-      setPartnerStream(remoteStream);
-      
-      // CRITICAL: Setup partner video with immediate execution
-      if (partnerVideo.current) {
-        debug('🎬 Setting up partner video element...');
-        
-        const success = await setupVideo(partnerVideo.current, remoteStream, 'partner');
-        
-        if (success) {
-          debug('✅ Partner video setup successful - YOU SHOULD SEE PARTNER NOW!');
-          setStatus('🎥 Connected - You can see each other!');
-        } else {
-          debug('❌ Partner video setup failed');
-          setStatus('⚠️ Connected but video issues detected');
-        }
-      } else {
-        debug('❌ Partner video element not available');
-        setStatus('❌ Partner video element not found');
-      }
-    });
-
-    // Enhanced connection state monitoring
-    peer.on('connect', () => {
-      debug('✅ Peer connection established (data channel)');
-      setCallAccepted(true);
-    });
-
-    peer.on('error', (err) => {
-      debug(`❌ Peer error: ${err.type || 'unknown'} - ${err.message}`);
-      setStatus('❌ Connection failed. Finding new partner...');
-      setTimeout(() => findPartner(), 3000);
-    });
-
-    peer.on('close', () => {
-      debug('🔌 Peer connection closed');
-      setStatus('👋 Partner disconnected');
-    });
-
-    // Monitor ICE connection state
-    if (peer._pc) {
-      peer._pc.oniceconnectionstatechange = () => {
-        debug(`🧊 ICE connection state: ${peer._pc.iceConnectionState}`);
-        if (peer._pc.iceConnectionState === 'connected') {
-          debug('🎉 ICE connection established successfully!');
-        } else if (peer._pc.iceConnectionState === 'failed') {
-          debug('💔 ICE connection failed');
-          setStatus('❌ Connection failed due to network issues');
-        }
-      };
-    }
-
-    return peer;
-  };
-
-  // Initialize media and socket connection
-  useEffect(() => {
-    let mounted = true;
-
-    const initializeChat = async () => {
+      // Fallback with lower quality
       try {
-        setStatus('🎥 Getting camera access...');
-        debug('🚀 Starting initialization...');
-
-        // Get user media first
-        const currentStream = await getUserMedia();
-        if (!mounted) return;
-
-        setStream(currentStream);
+        const fallbackConstraints = {
+          video: { width: 320, height: 240 },
+          audio: true
+        };
+        const fallbackStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        setLocalStream(fallbackStream);
         
-        // Setup local video
-        if (myVideo.current) {
-          await setupVideo(myVideo.current, currentStream, 'local');
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = fallbackStream;
         }
-
-        // Initialize socket connection
-        setStatus('🔌 Connecting to server...');
-        debug('🌐 Connecting to backend...');
-
-        socket.current = io(BACKEND_URL, {
-          transports: ['websocket', 'polling'],
-          timeout: 20000,
-          forceNew: true,
-          reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000
-        });
-
-        setupSocketListeners();
-
-      } catch (err) {
-        console.error('❌ Initialization error:', err);
-        setStatus('❌ Camera/Microphone access denied. Please allow access and refresh.');
-        debug(`💥 Initialization failed: ${err.message}`);
+        
+        return fallbackStream;
+      } catch (fallbackError) {
+        console.error('❌ Fallback media access failed:', fallbackError);
+        setConnectionStatus('Camera/microphone access denied. Please allow access and refresh.');
+        throw fallbackError;
       }
-    };
-
-    const setupSocketListeners = () => {
-      socket.current.on('connect', () => {
-        if (!mounted) return;
-        debug('✅ Connected to server');
-        setIsConnected(true);
-        setStatus('✅ Connected! Looking for partner...');
-        findPartner();
-      });
-
-      socket.current.on('disconnect', () => {
-        if (!mounted) return;
-        setIsConnected(false);
-        setStatus('❌ Disconnected from server');
-        debug('❌ Disconnected from server');
-      });
-
-      socket.current.on('matched', (partnerId) => {
-        if (!mounted) return;
-        debug(`🎯 Partner matched: ${partnerId}`);
-        setStatus('🎯 Partner found! Connecting...');
-        setTimeout(() => callUser(partnerId), 1000);
-      });
-
-      socket.current.on('waiting', () => {
-        if (!mounted) return;
-        setStatus('👀 Looking for a partner...');
-        debug('👀 Added to waiting queue');
-      });
-
-      socket.current.on('callUser', (data) => {
-        if (!mounted) return;
-        debug(`📞 Incoming call from: ${data.from}`);
-        setReceivingCall(true);
-        setCaller(data.from);
-        setCallerSignal(data.signal);
-        setStatus('📞 Incoming call... Connecting...');
-        // Auto-answer after a short delay
-        setTimeout(() => answerCall(data.signal, data.from), 1500);
-      });
-
-      socket.current.on('callAccepted', (signal) => {
-        if (!mounted) return;
-        debug('✅ Call accepted by partner');
-        setCallAccepted(true);
-        if (connectionRef.current) {
-          connectionRef.current.signal(signal);
-        }
-      });
-
-      socket.current.on('partnerDisconnected', () => {
-        if (!mounted) return;
-        setStatus('👋 Partner disconnected');
-        debug('👋 Partner disconnected');
-        endCall();
-      });
-    };
-
-    initializeChat();
-
-    return () => {
-      mounted = false;
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      if (socket.current) {
-        socket.current.disconnect();
-      }
-      if (connectionRef.current) {
-        connectionRef.current.destroy();
-      }
-    };
+    }
   }, []);
-
-  const callUser = useCallback((partnerId) => {
-    if (!stream) {
-      debug('❌ No local stream available for calling');
-      return;
-    }
-
-    debug(`📞 Calling user: ${partnerId}`);
-    const peer = createPeer(true, stream);
-
-    peer.on('signal', (data) => {
-      debug('📡 Sending call signal');
-      socket.current.emit('callUser', {
-        userToCall: partnerId,
-        signalData: data,
-        from: user.id
-      });
-    });
-
-    connectionRef.current = peer;
-  }, [stream, user.id]);
-
-  const answerCall = useCallback(async (signal, from) => {
-    if (!stream) {
-      debug('❌ No local stream available for answering');
-      return;
-    }
-
-    debug(`📞 Answering call from: ${from}`);
-    const peer = createPeer(false, stream);
-
-    peer.on('signal', (data) => {
-      debug('📡 Sending answer signal');
-      socket.current.emit('answerCall', { signal: data, to: from });
-    });
-
-    peer.signal(signal);
-    connectionRef.current = peer;
-    setReceivingCall(false);
-  }, [stream]);
-
-  const findPartner = () => {
-    if (socket.current && socket.current.connected) {
-      debug('🔍 Finding partner...');
-      socket.current.emit('findPartner', {
-        userId: user.id,
-        gender: user.gender,
-        preferredGender: user.preferredGender,
-        hasFilterCredit: user.filterCredits > 0 || user.isPremium
-      });
-    }
-  };
-
-  const endCall = () => {
-    debug('🛑 Ending call');
-    setCallAccepted(false);
-    setPartnerStream(null);
-    setReceivingCall(false);
+  
+  // Create peer connection with enhanced configuration
+  const createPeerConnection = useCallback(() => {
+    const config = {
+      iceServers: ICE_SERVERS,
+      iceCandidatePoolSize: 10,
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
+    };
     
-    if (connectionRef.current) {
-      connectionRef.current.destroy();
-      connectionRef.current = null;
+    const pc = new RTCPeerConnection(config);
+    
+    // Handle ICE candidates
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socketRef.current) {
+        console.log('📡 Sending ICE candidate');
+        socketRef.current.emit('ice-candidate', event.candidate);
+      }
+    };
+    
+    // Handle remote stream
+    pc.ontrack = (event) => {
+      console.log('🎬 Received remote stream');
+      const [stream] = event.streams;
+      setRemoteStream(stream);
+      
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = stream;
+      }
+      
+      setConnectionStatus('connected');
+    };
+    
+    // Handle connection state changes
+    pc.onconnectionstatechange = () => {
+      console.log('🔗 Connection state:', pc.connectionState);
+      
+      switch (pc.connectionState) {
+        case 'connected':
+          setConnectionStatus('connected');
+          setIsConnecting(false);
+          break;
+        case 'disconnected':
+        case 'failed':
+          setConnectionStatus('disconnected');
+          setIsConnecting(false);
+          setTimeout(() => findPartner(), 3000);
+          break;
+        case 'connecting':
+          setConnectionStatus('connecting');
+          setIsConnecting(true);
+          break;
+        default:
+          break;
+      }
+    };
+    
+    return pc;
+  }, []);
+  
+  // Initialize socket connection
+  const initializeSocket = useCallback(() => {
+    console.log('🌐 Connecting to signaling server...');
+    
+    socketRef.current = io(BACKEND_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true
+    });
+    
+    socketRef.current.on('connect', () => {
+      console.log('✅ Connected to signaling server');
+      setConnectionStatus('Looking for partner...');
+    });
+    
+    socketRef.current.on('disconnect', () => {
+      console.log('❌ Disconnected from signaling server');
+      setConnectionStatus('Disconnected from server');
+    });
+    
+    // Handle partner found
+    socketRef.current.on('matched', (partnerId) => {
+      console.log('🎯 Partner matched:', partnerId);
+      setConnectionStatus('Partner found! Connecting...');
+      setIsConnecting(true);
+      
+      setTimeout(() => {
+        initiateCall();
+      }, 1000);
+    });
+    
+    // Handle waiting for partner
+    socketRef.current.on('waiting', () => {
+      setConnectionStatus('Looking for partner...');
+      setIsConnecting(false);
+    });
+    
+    // Handle incoming call
+    socketRef.current.on('offer', async (offer) => {
+      console.log('📞 Received call offer');
+      setConnectionStatus('Incoming call... Connecting...');
+      setIsConnecting(true);
+      
+      await handleOffer(offer);
+    });
+    
+    // Handle call answer
+    socketRef.current.on('answer', async (answer) => {
+      console.log('✅ Received call answer');
+      await handleAnswer(answer);
+    });
+    
+    // Handle ICE candidates
+    socketRef.current.on('ice-candidate', async (candidate) => {
+      console.log('📡 Received ICE candidate');
+      await handleIceCandidate(candidate);
+    });
+    
+    // Handle partner disconnect
+    socketRef.current.on('partnerDisconnected', () => {
+      console.log('👋 Partner disconnected');
+      setConnectionStatus('Partner disconnected');
+      setRemoteStream(null);
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = null;
+      }
+      
+      // Auto find new partner after delay
+      setTimeout(() => {
+        findPartner();
+      }, 2000);
+    });
+  }, []);
+  
+  // Initiate a call (create offer)
+  const initiateCall = useCallback(async () => {
+    if (!localStream || !socketRef.current) return;
+    
+    try {
+      peerConnectionRef.current = createPeerConnection();
+      
+      // Add local stream tracks
+      localStream.getTracks().forEach(track => {
+        peerConnectionRef.current.addTrack(track, localStream);
+      });
+      
+      // Create and send offer
+      const offer = await peerConnectionRef.current.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
+      
+      await peerConnectionRef.current.setLocalDescription(offer);
+      
+      console.log('📞 Sending call offer');
+      socketRef.current.emit('offer', offer);
+      
+    } catch (error) {
+      console.error('❌ Failed to initiate call:', error);
+      setConnectionStatus('Failed to initiate call');
     }
-
-    if (partnerVideo.current) {
-      partnerVideo.current.srcObject = null;
+  }, [localStream, createPeerConnection]);
+  
+  // Handle incoming offer
+  const handleOffer = useCallback(async (offer) => {
+    if (!localStream) return;
+    
+    try {
+      peerConnectionRef.current = createPeerConnection();
+      
+      // Add local stream tracks
+      localStream.getTracks().forEach(track => {
+        peerConnectionRef.current.addTrack(track, localStream);
+      });
+      
+      await peerConnectionRef.current.setRemoteDescription(offer);
+      
+      // Create and send answer
+      const answer = await peerConnectionRef.current.createAnswer();
+      await peerConnectionRef.current.setLocalDescription(answer);
+      
+      console.log('📞 Sending call answer');
+      socketRef.current.emit('answer', answer);
+      
+    } catch (error) {
+      console.error('❌ Failed to handle offer:', error);
+      setConnectionStatus('Failed to connect');
     }
-
-    if (socket.current) {
-      socket.current.emit('endCall');
+  }, [localStream, createPeerConnection]);
+  
+  // Handle call answer
+  const handleAnswer = useCallback(async (answer) => {
+    if (!peerConnectionRef.current) return;
+    
+    try {
+      await peerConnectionRef.current.setRemoteDescription(answer);
+      console.log('✅ Call answer processed');
+    } catch (error) {
+      console.error('❌ Failed to handle answer:', error);
     }
-
-    setStatus('📞 Call ended');
-  };
-
-  const nextPartner = () => {
-    debug('🔄 Looking for next partner');
-    endCall();
-    setStatus('🔍 Looking for new partner...');
-    setTimeout(() => findPartner(), 1000);
-  };
-
-  const toggleAudio = () => {
-    if (stream) {
-      const audioTrack = stream.getAudioTracks()[0];
+  }, []);
+  
+  // Handle ICE candidates
+  const handleIceCandidate = useCallback(async (candidate) => {
+    if (!peerConnectionRef.current) return;
+    
+    try {
+      await peerConnectionRef.current.addIceCandidate(candidate);
+      console.log('📡 ICE candidate added');
+    } catch (error) {
+      console.error('❌ Failed to add ICE candidate:', error);
+    }
+  }, []);
+  
+  // Find a partner
+  const findPartner = useCallback(() => {
+    if (!socketRef.current) return;
+    
+    console.log('🔍 Looking for partner...');
+    setConnectionStatus('Looking for partner...');
+    setIsConnecting(false);
+    
+    // Clean up previous connection
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    
+    setRemoteStream(null);
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    
+    socketRef.current.emit('findPartner', {
+      userId: user.id,
+      gender: user.gender,
+      preferredGender: user.preferredGender,
+      hasFilterCredit: user.filterCredits > 0 || user.isPremium
+    });
+  }, [user]);
+  
+  // Toggle audio
+  const toggleAudio = useCallback(() => {
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioEnabled;
         setAudioEnabled(!audioEnabled);
-        debug(`🎤 Audio ${audioEnabled ? 'disabled' : 'enabled'}`);
       }
     }
-  };
-
-  const toggleVideo = () => {
-    if (stream) {
-      const videoTrack = stream.getVideoTracks()[0];
+  }, [localStream, audioEnabled]);
+  
+  // Toggle video
+  const toggleVideo = useCallback(() => {
+    if (localStream) {
+      const videoTrack = localStream.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoEnabled;
         setVideoEnabled(!videoEnabled);
-        debug(`📹 Video ${videoEnabled ? 'disabled' : 'enabled'}`);
       }
     }
-  };
-
+  }, [localStream, videoEnabled]);
+  
+  // End call and find next partner
+  const nextPartner = useCallback(() => {
+    console.log('🔄 Finding next partner...');
+    
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    
+    if (socketRef.current) {
+      socketRef.current.emit('endCall');
+    }
+    
+    setRemoteStream(null);
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    
+    setTimeout(() => {
+      findPartner();
+    }, 1000);
+  }, [findPartner]);
+  
+  // Stop call and go home
+  const stopCall = useCallback(() => {
+    console.log('🛑 Stopping call');
+    
+    // Stop local stream
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+    }
+    
+    // Close peer connection
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+    }
+    
+    // Disconnect socket
+    if (socketRef.current) {
+      socketRef.current.emit('endCall');
+      socketRef.current.disconnect();
+    }
+    
+    navigate('/');
+  }, [localStream, navigate]);
+  
+  // Initialize everything
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await getUserMedia();
+        initializeSocket();
+      } catch (error) {
+        console.error('❌ Initialization failed:', error);
+      }
+    };
+    
+    init();
+    
+    // Cleanup on unmount
+    return () => {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+      
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+      }
+      
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, [getUserMedia, initializeSocket]);
+  
+  // Auto-find partner when local stream is ready
+  useEffect(() => {
+    if (localStream && socketRef.current && socketRef.current.connected) {
+      findPartner();
+    }
+  }, [localStream, findPartner]);
+  
   return (
     <Container>
-      <Status status={status}>{status}</Status>
+      <ConnectionStatus status={connectionStatus.includes('connected') ? 'connected' : 
+        connectionStatus.includes('connecting') || connectionStatus.includes('Looking') ? 'connecting' : 'disconnected'}>
+        {connectionStatus}
+      </ConnectionStatus>
       
       <VideoContainer>
-        <MyVideo ref={myVideo} autoPlay playsInline muted />
-        <PartnerVideo 
-          ref={partnerVideo} 
-          autoPlay 
-          playsInline 
-          $hasStream={!!partnerStream}
-        />
+        <VideoWrapper>
+          <Video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+          />
+          <VideoLabel>You</VideoLabel>
+        </VideoWrapper>
+        
+        <VideoWrapper>
+          {remoteStream ? (
+            <Video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+            />
+          ) : (
+            <PlaceholderMessage>
+              {isConnecting ? '🔄 Connecting...' : '👋 Waiting for partner...'}
+            </PlaceholderMessage>
+          )}
+          <VideoLabel>Partner</VideoLabel>
+        </VideoWrapper>
       </VideoContainer>
-
+      
       <Controls>
-        <Button 
-          className="home" 
-          onClick={() => navigate('/')}
-        >
-          🏠 Home
-        </Button>
-        
-        <Button 
-          className="control" 
+        <ControlButton
+          className="control"
+          active={audioEnabled}
           onClick={toggleAudio}
+          title={audioEnabled ? 'Mute audio' : 'Unmute audio'}
         >
-          {audioEnabled ? '🔊' : '🔇'}
-        </Button>
+          {audioEnabled ? '🎤' : '🔇'}
+        </ControlButton>
         
-        <Button 
-          className="control" 
+        <ControlButton
+          className="control"
+          active={videoEnabled}
           onClick={toggleVideo}
+          title={videoEnabled ? 'Turn off camera' : 'Turn on camera'}
         >
           {videoEnabled ? '📹' : '📷'}
-        </Button>
+        </ControlButton>
         
-        <Button 
-          className="stop" 
-          onClick={endCall}
-          disabled={!callAccepted}
+        <ControlButton
+          className="primary"
+          onClick={stopCall}
+          title="End call and go home"
         >
-          🛑 Stop
-        </Button>
+          🏠
+        </ControlButton>
         
-        <Button 
-          className="next" 
+        <ControlButton
+          className="secondary"
           onClick={nextPartner}
+          disabled={isConnecting}
+          title="Find next partner"
         >
-          🔄 Next
-        </Button>
+          🔄
+        </ControlButton>
       </Controls>
     </Container>
   );
