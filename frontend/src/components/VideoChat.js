@@ -50,20 +50,25 @@ const MyVideo = styled(Video)`
 `;
 
 const PartnerVideo = styled(Video)`
-  ${props => !props.hasStream && `
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
+  position: relative;
+  
+  &::before {
+    content: ${props => props.hasStream ? '""' : '"👋 Waiting for partner..."'};
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     color: #fff;
+    font-size: 18px;
     font-weight: 600;
-    background: linear-gradient(45deg, #2c3e50, #3498db);
-    
-    &:before {
-      content: '👋 Waiting for partner...';
-      text-align: center;
-    }
-  `}
+    z-index: 1;
+    text-align: center;
+    background: ${props => props.hasStream ? 'transparent' : 'linear-gradient(45deg, #2c3e50, #3498db)'};
+    padding: ${props => props.hasStream ? '0' : '20px'};
+    border-radius: ${props => props.hasStream ? '0' : '10px'};
+    width: ${props => props.hasStream ? 'auto' : '80%'};
+    max-width: 300px;
+  }
 `;
 
 const Controls = styled.div`
@@ -167,7 +172,7 @@ const Status = styled.div`
 const VideoChat = ({ user, updateUser }) => {
   const navigate = useNavigate();
   const myVideo = useRef();
-  const userVideo = useRef();
+  const partnerVideo = useRef();
   const connectionRef = useRef();
   const socket = useRef();
   
@@ -186,7 +191,7 @@ const VideoChat = ({ user, updateUser }) => {
 
   // Debug logger
   const debug = (message) => {
-    console.log('[DEBUG]', message);
+    console.log('[VideoChat DEBUG]', message);
   };
 
   // Enhanced getUserMedia with mobile optimization
@@ -196,16 +201,16 @@ const VideoChat = ({ user, updateUser }) => {
     const constraints = {
       video: {
         width: isMobile ? { min: 320, ideal: 480, max: 640 } : { min: 480, ideal: 720, max: 1280 },
-        height: isMobile ? { min: 240, ideal: 640, max: 480 } : { min: 360, ideal: 480, max: 720 },
+        height: isMobile ? { min: 240, ideal: 360, max: 480 } : { min: 360, ideal: 480, max: 720 },
         frameRate: { min: 15, ideal: 24, max: 30 },
         facingMode: { ideal: 'user' }
       },
       audio: {
-        echoCancellation: { ideal: true },
-        noiseSuppression: { ideal: true },
-        autoGainControl: { ideal: true },
-        sampleRate: { ideal: 44100 },
-        channelCount: { ideal: 1 }
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 44100,
+        channelCount: 1
       }
     };
 
@@ -213,16 +218,10 @@ const VideoChat = ({ user, updateUser }) => {
       debug('Requesting camera/microphone access...');
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       
-      // Ensure audio tracks are enabled
-      mediaStream.getAudioTracks().forEach(track => {
+      // Ensure all tracks are enabled
+      mediaStream.getTracks().forEach(track => {
         track.enabled = true;
-        console.log('Audio track enabled:', track.label);
-      });
-      
-      // Ensure video tracks are enabled
-      mediaStream.getVideoTracks().forEach(track => {
-        track.enabled = true;
-        console.log('Video track enabled:', track.label);
+        debug(`Track enabled: ${track.kind} - ${track.label}`);
       });
       
       debug(`Media stream obtained - Video: ${mediaStream.getVideoTracks().length}, Audio: ${mediaStream.getAudioTracks().length}`);
@@ -233,43 +232,81 @@ const VideoChat = ({ user, updateUser }) => {
     }
   };
 
-  // Fixed video play function
-  const forceVideoPlay = async (videoElement, streamType = 'unknown') => {
-    if (!videoElement || !videoElement.srcObject) return;
+  // Fixed video play function with multiple fallbacks
+  const setupVideo = async (videoElement, stream, type = 'unknown') => {
+    if (!videoElement || !stream) {
+      debug(`Video setup failed - missing element or stream for ${type}`);
+      return false;
+    }
     
     try {
-      // Essential mobile settings
-      videoElement.muted = streamType === 'local'; // Only mute local video to prevent feedback
+      debug(`Setting up ${type} video...`);
+      
+      // Clear any existing stream first
+      if (videoElement.srcObject) {
+        videoElement.srcObject.getTracks().forEach(track => track.stop());
+      }
+      
+      // Set the stream
+      videoElement.srcObject = stream;
+      
+      // Configure video element properties
       videoElement.playsInline = true;
       videoElement.autoplay = true;
       videoElement.controls = false;
+      videoElement.muted = type === 'local'; // Only mute local video to prevent feedback
       
-      // Set attributes for mobile compatibility
+      // Set essential attributes for mobile
       videoElement.setAttribute('playsinline', 'true');
       videoElement.setAttribute('webkit-playsinline', 'true');
       videoElement.setAttribute('autoplay', 'true');
       
-      // Multiple play attempts
-      for (let i = 0; i < 5; i++) {
+      // Wait for metadata to load
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Metadata timeout')), 5000);
+        
+        videoElement.onloadedmetadata = () => {
+          clearTimeout(timeout);
+          debug(`${type} video metadata loaded`);
+          resolve();
+        };
+        
+        videoElement.onerror = (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        };
+      });
+      
+      // Attempt to play with multiple retries
+      for (let i = 0; i < 3; i++) {
         try {
           await videoElement.play();
-          debug(`${streamType} video playing successfully`);
-          return;
-        } catch (err) {
-          if (err.name === 'NotAllowedError') {
-            debug(`Video play blocked by user - attempt ${i + 1}`);
-          } else if (err.name === 'AbortError') {
-            debug(`Video play aborted - attempt ${i + 1}`);
+          debug(`${type} video playing successfully`);
+          return true;
+        } catch (playErr) {
+          debug(`${type} video play attempt ${i + 1} failed: ${playErr.message}`);
+          
+          if (playErr.name === 'NotAllowedError') {
+            // User interaction required
+            debug(`${type} video requires user interaction`);
+            break;
           }
-          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
+      
+      debug(`${type} video setup completed with potential play issues`);
+      return true;
+      
     } catch (err) {
-      debug(`Video play completely failed for ${streamType}: ${err.message}`);
+      debug(`${type} video setup failed completely: ${err.message}`);
+      return false;
     }
   };
 
-  // Enhanced peer configuration
+  // Enhanced peer configuration with better TURN servers
   const getPeerConfig = () => ({
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -296,18 +333,63 @@ const VideoChat = ({ user, updateUser }) => {
     rtcpMuxPolicy: 'require'
   });
 
-  // Enhanced peer creation
-  const createPeer = (initiator, stream) => {
+  // Enhanced peer creation with better stream handling
+  const createPeer = (initiator, localStream) => {
+    debug(`Creating peer - initiator: ${initiator}`);
+    
     const peer = new Peer({
       initiator,
       trickle: false,
-      stream: stream,
+      stream: localStream,
       config: getPeerConfig(),
       offerOptions: {
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
         voiceActivityDetection: false
       }
+    });
+
+    // Enhanced stream handling
+    peer.on('stream', async (remoteStream) => {
+      debug(`🎥 Received remote stream with ${remoteStream.getTracks().length} tracks`);
+      
+      // Log track details
+      remoteStream.getTracks().forEach(track => {
+        debug(`Remote track: ${track.kind} - ${track.label} - enabled: ${track.enabled}`);
+      });
+      
+      // Set partner stream state
+      setPartnerStream(remoteStream);
+      
+      // Setup partner video with retry logic
+      if (partnerVideo.current) {
+        const success = await setupVideo(partnerVideo.current, remoteStream, 'partner');
+        if (success) {
+          debug('✅ Partner video setup successful');
+          setStatus('🎥 Connected - You can see each other!');
+        } else {
+          debug('❌ Partner video setup failed');
+          setStatus('⚠️ Connected but video issues detected');
+        }
+      } else {
+        debug('❌ Partner video element not available');
+      }
+    });
+
+    peer.on('connect', () => {
+      debug('✅ Peer connection established');
+      setCallAccepted(true);
+    });
+
+    peer.on('error', (err) => {
+      debug(`❌ Peer error: ${err.message}`);
+      setStatus('❌ Connection failed. Finding new partner...');
+      setTimeout(() => findPartner(), 3000);
+    });
+
+    peer.on('close', () => {
+      debug('🔌 Peer connection closed');
+      setStatus('👋 Partner disconnected');
     });
 
     return peer;
@@ -322,14 +404,15 @@ const VideoChat = ({ user, updateUser }) => {
         setStatus('🎥 Getting camera access...');
         debug('Starting initialization...');
 
-        // Get user media
+        // Get user media first
         const currentStream = await getUserMedia();
         if (!mounted) return;
 
         setStream(currentStream);
+        
+        // Setup local video
         if (myVideo.current) {
-          myVideo.current.srcObject = currentStream;
-          await forceVideoPlay(myVideo.current, 'local');
+          await setupVideo(myVideo.current, currentStream, 'local');
         }
 
         // Initialize socket connection
@@ -357,7 +440,7 @@ const VideoChat = ({ user, updateUser }) => {
     const setupSocketListeners = () => {
       socket.current.on('connect', () => {
         if (!mounted) return;
-        debug('Connected to server');
+        debug('✅ Connected to server');
         setIsConnected(true);
         setStatus('✅ Connected! Looking for partner...');
         findPartner();
@@ -367,12 +450,12 @@ const VideoChat = ({ user, updateUser }) => {
         if (!mounted) return;
         setIsConnected(false);
         setStatus('❌ Disconnected from server');
-        debug('Disconnected from server');
+        debug('❌ Disconnected from server');
       });
 
       socket.current.on('matched', (partnerId) => {
         if (!mounted) return;
-        debug(`Partner matched: ${partnerId}`);
+        debug(`🎯 Partner matched: ${partnerId}`);
         setStatus('🎯 Partner found! Connecting...');
         setTimeout(() => callUser(partnerId), 1000);
       });
@@ -380,24 +463,24 @@ const VideoChat = ({ user, updateUser }) => {
       socket.current.on('waiting', () => {
         if (!mounted) return;
         setStatus('👀 Looking for a partner...');
-        debug('Added to waiting queue');
+        debug('👀 Added to waiting queue');
       });
 
       socket.current.on('callUser', (data) => {
         if (!mounted) return;
-        debug(`Incoming call from: ${data.from}`);
+        debug(`📞 Incoming call from: ${data.from}`);
         setReceivingCall(true);
         setCaller(data.from);
         setCallerSignal(data.signal);
-        setStatus('📞 Incoming call...');
-        setTimeout(() => answerCall(data.signal, data.from), 1000);
+        setStatus('📞 Incoming call... Connecting...');
+        // Auto-answer after a short delay
+        setTimeout(() => answerCall(data.signal, data.from), 1500);
       });
 
       socket.current.on('callAccepted', (signal) => {
         if (!mounted) return;
-        debug('Call accepted');
+        debug('✅ Call accepted by partner');
         setCallAccepted(true);
-        setStatus('🎥 Connected to partner');
         if (connectionRef.current) {
           connectionRef.current.signal(signal);
         }
@@ -406,7 +489,7 @@ const VideoChat = ({ user, updateUser }) => {
       socket.current.on('partnerDisconnected', () => {
         if (!mounted) return;
         setStatus('👋 Partner disconnected');
-        debug('Partner disconnected');
+        debug('👋 Partner disconnected');
         endCall();
       });
     };
@@ -428,11 +511,16 @@ const VideoChat = ({ user, updateUser }) => {
   }, []);
 
   const callUser = useCallback((partnerId) => {
-    debug(`Calling user: ${partnerId}`);
+    if (!stream) {
+      debug('❌ No local stream available for calling');
+      return;
+    }
+
+    debug(`📞 Calling user: ${partnerId}`);
     const peer = createPeer(true, stream);
 
     peer.on('signal', (data) => {
-      debug('Sending call signal');
+      debug('📡 Sending call signal');
       socket.current.emit('callUser', {
         userToCall: partnerId,
         signalData: data,
@@ -440,61 +528,21 @@ const VideoChat = ({ user, updateUser }) => {
       });
     });
 
-    peer.on('stream', async (partnerStream) => {
-      debug(`Received partner stream`);
-      setPartnerStream(partnerStream);
-      
-      if (userVideo.current) {
-        userVideo.current.srcObject = partnerStream;
-        // Don't mute partner video - you want to hear them!
-        userVideo.current.muted = false;
-        userVideo.current.volume = 1.0;
-        await forceVideoPlay(userVideo.current, 'partner');
-      }
-    });
-
-    peer.on('connect', () => {
-      debug('Peer connected successfully');
-      setCallAccepted(true);
-      setStatus('🎥 Connected to partner');
-    });
-
-    peer.on('error', (err) => {
-      debug(`Peer error: ${err.code} - ${err.message}`);
-      setStatus('❌ Connection failed. Finding new partner...');
-      setTimeout(() => findPartner(), 3000);
-    });
-
     connectionRef.current = peer;
   }, [stream, user.id]);
 
   const answerCall = useCallback(async (signal, from) => {
-    debug(`Answering call from: ${from}`);
+    if (!stream) {
+      debug('❌ No local stream available for answering');
+      return;
+    }
+
+    debug(`📞 Answering call from: ${from}`);
     const peer = createPeer(false, stream);
 
     peer.on('signal', (data) => {
-      debug('Sending answer signal');
+      debug('📡 Sending answer signal');
       socket.current.emit('answerCall', { signal: data, to: from });
-    });
-
-    peer.on('stream', async (partnerStream) => {
-      debug(`Received partner stream (answer)`);
-      setPartnerStream(partnerStream);
-      
-      if (userVideo.current) {
-        userVideo.current.srcObject = partnerStream;
-        userVideo.current.muted = false; // Essential for hearing partner
-        userVideo.current.volume = 1.0;
-        await forceVideoPlay(userVideo.current, 'partner');
-      }
-      
-      setCallAccepted(true);
-      setStatus('🎥 Connected to partner');
-    });
-
-    peer.on('error', (err) => {
-      debug(`Answer peer error: ${err.message}`);
-      setStatus('❌ Connection failed');
     });
 
     peer.signal(signal);
@@ -504,7 +552,7 @@ const VideoChat = ({ user, updateUser }) => {
 
   const findPartner = () => {
     if (socket.current && socket.current.connected) {
-      debug('Finding partner...');
+      debug('🔍 Finding partner...');
       socket.current.emit('findPartner', {
         userId: user.id,
         gender: user.gender,
@@ -515,7 +563,7 @@ const VideoChat = ({ user, updateUser }) => {
   };
 
   const endCall = () => {
-    debug('Ending call');
+    debug('🛑 Ending call');
     setCallAccepted(false);
     setPartnerStream(null);
     setReceivingCall(false);
@@ -525,8 +573,8 @@ const VideoChat = ({ user, updateUser }) => {
       connectionRef.current = null;
     }
 
-    if (userVideo.current) {
-      userVideo.current.srcObject = null;
+    if (partnerVideo.current) {
+      partnerVideo.current.srcObject = null;
     }
 
     if (socket.current) {
@@ -537,7 +585,7 @@ const VideoChat = ({ user, updateUser }) => {
   };
 
   const nextPartner = () => {
-    debug('Looking for next partner');
+    debug('🔄 Looking for next partner');
     endCall();
     setStatus('🔍 Looking for new partner...');
     setTimeout(() => findPartner(), 1000);
@@ -549,6 +597,7 @@ const VideoChat = ({ user, updateUser }) => {
       if (audioTrack) {
         audioTrack.enabled = !audioEnabled;
         setAudioEnabled(!audioEnabled);
+        debug(`🎤 Audio ${audioEnabled ? 'disabled' : 'enabled'}`);
       }
     }
   };
@@ -559,6 +608,7 @@ const VideoChat = ({ user, updateUser }) => {
       if (videoTrack) {
         videoTrack.enabled = !videoEnabled;
         setVideoEnabled(!videoEnabled);
+        debug(`📹 Video ${videoEnabled ? 'disabled' : 'enabled'}`);
       }
     }
   };
@@ -570,7 +620,7 @@ const VideoChat = ({ user, updateUser }) => {
       <VideoContainer>
         <MyVideo ref={myVideo} autoPlay playsInline muted />
         <PartnerVideo 
-          ref={userVideo} 
+          ref={partnerVideo} 
           autoPlay 
           playsInline 
           hasStream={!!partnerStream}
