@@ -18,7 +18,7 @@ body {
   min-height: 100vh;
 }
 
-/* Video optimizations */
+/* Enhanced Video optimizations */
 video {
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
@@ -26,7 +26,40 @@ video {
   backface-visibility: hidden;
   -webkit-playsinline: true;
   playsinline: true;
-  muted: true;
+  object-fit: cover;
+}
+
+/* Mobile-specific optimizations */
+@media screen and (max-width: 768px) {
+  video {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-playsinline: true;
+    playsinline: true;
+    object-fit: cover;
+  }
+
+  /* Prevent zoom on input focus */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Better touch targets */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+}
+
+/* iOS Safari specific */
+@supports (-webkit-touch-callout: none) {
+  video {
+    -webkit-playsinline: true;
+    playsinline: true;
+  }
 }
 
 /* Loading spinner */
@@ -58,23 +91,23 @@ video {
 .status-connecting { background-color: #ffc107; }
 .status-offline { background-color: #dc3545; }
 
-/* Responsive Design */
+/* Enhanced responsive design */
 @media (max-width: 768px) {
   body {
     font-size: 14px;
   }
-  
+
   .video-container {
     flex-direction: column !important;
   }
-  
+
   .video-container video {
     width: 100% !important;
     height: 40vh !important;
     max-height: 300px;
     min-height: 200px;
   }
-  
+
   button {
     min-height: 44px;
     -webkit-appearance: none;
@@ -82,7 +115,7 @@ video {
     font-size: 14px;
     padding: 10px 15px;
   }
-  
+
   input, select {
     -webkit-appearance: none;
     border-radius: 8px;
@@ -96,7 +129,7 @@ video {
     height: 35vh !important;
     max-height: 250px;
   }
-  
+
   .chat-box {
     width: 95% !important;
     right: 2.5% !important;
@@ -104,15 +137,15 @@ video {
   }
 }
 
-/* Animations */
+/* Enhanced animations */
 @keyframes fadeIn {
-  from { 
-    opacity: 0; 
-    transform: translateY(20px); 
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -128,6 +161,21 @@ video {
 
 .pulse {
   animation: pulse 2s infinite;
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-bottom {
+  animation: slideInFromBottom 0.3s ease-out;
 }
 
 /* Custom scrollbar */
@@ -146,4 +194,120 @@ video {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #777;
+}
+
+/* Enhanced button styles */
+.btn-gradient {
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  border: none;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 25px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.btn-gradient:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+/* Video overlay effects */
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 70%,
+    rgba(0,0,0,0.5) 100%
+  );
+  pointer-events: none;
+}
+
+/* Connection quality indicator */
+.connection-quality {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0,0,0,0.7);
+  padding: 8px 12px;
+  border-radius: 15px;
+  color: white;
+  font-size: 12px;
+}
+
+.quality-excellent { color: #28a745; }
+.quality-good { color: #ffc107; }
+.quality-poor { color: #dc3545; }
+
+/* Mobile landscape orientation */
+@media screen and (max-width: 768px) and (orientation: landscape) {
+  .video-container {
+    flex-direction: row !important;
+  }
+  
+  .video-container video {
+    width: 50% !important;
+    height: 100vh !important;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  button:hover {
+    transform: none;
+  }
+  
+  button:active {
+    transform: scale(0.98);
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2) {
+  video {
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #121212;
+    color: #ffffff;
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus styles for keyboard navigation */
+button:focus,
+input:focus,
+select:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  button {
+    border: 2px solid currentColor;
+  }
 }
