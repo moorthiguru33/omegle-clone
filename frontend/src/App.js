@@ -18,20 +18,29 @@ function App() {
     // Load user data from localStorage
     const savedUser = localStorage.getItem('omegleUser');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error('Error parsing saved user:', error);
+        // Generate new user if parsing fails
+        generateNewUser();
+      }
     } else {
-      // Generate new user ID
-      const newUser = {
-        id: Math.random().toString(36).substring(7),
-        gender: null,
-        preferredGender: null,
-        filterCredits: 1,
-        isPremium: false
-      };
-      setUser(newUser);
-      localStorage.setItem('omegleUser', JSON.stringify(newUser));
+      generateNewUser();
     }
-  }, []); // Fixed: Empty dependency array is correct here
+  }, []);
+
+  const generateNewUser = () => {
+    const newUser = {
+      id: 'user_' + Math.random().toString(36).substring(2, 15),
+      gender: null,
+      preferredGender: null,
+      filterCredits: 3, // Start with 3 free credits
+      isPremium: false
+    };
+    setUser(newUser);
+    localStorage.setItem('omegleUser', JSON.stringify(newUser));
+  };
 
   const updateUser = (updatedUser) => {
     setUser(updatedUser);
