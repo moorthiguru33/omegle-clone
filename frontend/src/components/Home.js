@@ -195,7 +195,6 @@ const Home = ({ user, updateUser }) => {
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState('');
 
-  // Validate form
   const validateForm = () => {
     setValidationError('');
 
@@ -262,7 +261,6 @@ const Home = ({ user, updateUser }) => {
     setValidationError('');
   };
 
-  // Ensure user object exists
   if (!user) {
     return (
       <Container>
