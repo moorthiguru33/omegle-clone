@@ -14,9 +14,33 @@ function App() {
     isPremium: false
   });
 
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    // Generate user ID on app load (no localStorage)
-    generateNewUser();
+    const initializeUser = async () => {
+      try {
+        // Try to get user data from sessionStorage first
+        const sessionUser = sessionStorage.getItem('omegleUser');
+        
+        if (sessionUser) {
+          const parsed = JSON.parse(sessionUser);
+          if (parsed && typeof parsed === 'object' && parsed.id) {
+            setUser(parsed);
+          } else {
+            generateNewUser();
+          }
+        } else {
+          generateNewUser();
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        generateNewUser();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeUser();
   }, []);
 
   const generateNewUser = () => {
@@ -25,21 +49,59 @@ function App() {
       gender: null,
       preferredGender: null,
       filterCredits: 3,
-      isPremium: false
+      isPremium: false,
+      createdAt: Date.now()
     };
+    
     setUser(newUser);
-    console.log('Generated new user:', newUser.id);
+    
+    try {
+      sessionStorage.setItem('omegleUser', JSON.stringify(newUser));
+    } catch (error) {
+      console.error('Failed to save user data:', error);
+    }
   };
 
   const updateUser = (updatedUser) => {
-    console.log('Updating user:', updatedUser);
-    setUser(updatedUser);
+    if (!updatedUser || typeof updatedUser !== 'object') {
+      console.error('Invalid user data provided');
+      return;
+    }
+
+    const validatedUser = {
+      ...user,
+      ...updatedUser,
+      id: user.id, // Ensure ID doesn't change
+      updatedAt: Date.now()
+    };
+
+    setUser(validatedUser);
+    
+    try {
+      sessionStorage.setItem('omegleUser', JSON.stringify(validatedUser));
+    } catch (error) {
+      console.error('Failed to save updated user data:', error);
+    }
   };
 
-  // Reset user session (useful for testing)
-  const resetUser = () => {
-    generateNewUser();
-  };
+  if (isLoading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        fontSize: '18px'
+      }}>
+        <div>
+          <div className="loading-spinner" />
+          <p>Initializing...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>
@@ -47,31 +109,19 @@ function App() {
         <Routes>
           <Route 
             path="/" 
-            element={
-              <Home 
-                user={user} 
-                updateUser={updateUser} 
-                resetUser={resetUser}
-              />
-            } 
+            element={<Home user={user} updateUser={updateUser} />} 
           />
           <Route 
             path="/chat" 
-            element={
-              <VideoChat 
-                user={user} 
-                updateUser={updateUser} 
-              />
-            } 
+            element={<VideoChat user={user} updateUser={updateUser} />} 
           />
           <Route 
             path="/premium" 
-            element={
-              <Premium 
-                user={user} 
-                updateUser={updateUser} 
-              />
-            } 
+            element={<Premium user={user} updateUser={updateUser} />} 
+          />
+          <Route 
+            path="*" 
+            element={<Home user={user} updateUser={updateUser} />} 
           />
         </Routes>
       </div>
