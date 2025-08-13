@@ -1,16 +1,16 @@
 {
   "name": "omegle-clone-frontend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
-    "socket.io-client": "^4.7.2",
+    "socket.io-client": "^4.7.5",
     "simple-peer": "^9.11.1",
-    "uuid": "^9.0.0",
-    "react-router-dom": "^6.14.2",
-    "styled-components": "^6.0.7"
+    "uuid": "^9.0.1",
+    "react-router-dom": "^6.20.1",
+    "styled-components": "^6.1.1"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -35,5 +35,6 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "homepage": "."
 }
