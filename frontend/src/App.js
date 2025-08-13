@@ -15,44 +15,64 @@ function App() {
   });
 
   useEffect(() => {
-    // Load user data from localStorage
-    const savedUser = localStorage.getItem('omegleUser');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        console.error('Error parsing saved user:', error);
-        generateNewUser();
-      }
-    } else {
-      generateNewUser();
-    }
+    // Generate user ID on app load (no localStorage)
+    generateNewUser();
   }, []);
 
   const generateNewUser = () => {
     const newUser = {
-      id: 'user_' + Math.random().toString(36).substring(2, 15),
+      id: 'user_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now(),
       gender: null,
       preferredGender: null,
       filterCredits: 3,
       isPremium: false
     };
     setUser(newUser);
-    localStorage.setItem('omegleUser', JSON.stringify(newUser));
+    console.log('Generated new user:', newUser.id);
   };
 
   const updateUser = (updatedUser) => {
+    console.log('Updating user:', updatedUser);
     setUser(updatedUser);
-    localStorage.setItem('omegleUser', JSON.stringify(updatedUser));
+  };
+
+  // Reset user session (useful for testing)
+  const resetUser = () => {
+    generateNewUser();
   };
 
   return (
     <Router>
       <div className="App">
         <Routes>
-          <Route path="/" element={<Home user={user} updateUser={updateUser} />} />
-          <Route path="/chat" element={<VideoChat user={user} updateUser={updateUser} />} />
-          <Route path="/premium" element={<Premium user={user} updateUser={updateUser} />} />
+          <Route 
+            path="/" 
+            element={
+              <Home 
+                user={user} 
+                updateUser={updateUser} 
+                resetUser={resetUser}
+              />
+            } 
+          />
+          <Route 
+            path="/chat" 
+            element={
+              <VideoChat 
+                user={user} 
+                updateUser={updateUser} 
+              />
+            } 
+          />
+          <Route 
+            path="/premium" 
+            element={
+              <Premium 
+                user={user} 
+                updateUser={updateUser} 
+              />
+            } 
+          />
         </Routes>
       </div>
     </Router>
