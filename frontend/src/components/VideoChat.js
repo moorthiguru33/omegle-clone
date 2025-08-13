@@ -24,6 +24,11 @@ const VideoContainer = styled.div`
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
   }
+  
+  @media screen and (max-width: 768px) and (orientation: landscape) {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+  }
 `;
 
 const VideoWrapper = styled.div`
@@ -32,6 +37,7 @@ const VideoWrapper = styled.div`
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  min-height: 200px;
 `;
 
 const Video = styled.video`
@@ -39,19 +45,30 @@ const Video = styled.video`
   height: 100%;
   object-fit: cover;
   border-radius: 12px;
+  background: #000;
+  
+  /* Enhanced mobile support */
+  -webkit-playsinline: true;
+  -moz-playsinline: true;
+  playsinline: true;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 `;
 
 const VideoLabel = styled.div`
   position: absolute;
   top: 12px;
   left: 12px;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.8);
   color: white;
   padding: 6px 12px;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
   backdrop-filter: blur(10px);
+  z-index: 10;
 `;
 
 const ConnectionStatus = styled.div`
@@ -70,6 +87,14 @@ const ConnectionStatus = styled.div`
   font-weight: 600;
   backdrop-filter: blur(10px);
   z-index: 1000;
+  max-width: 200px;
+  text-align: center;
+  
+  @media (max-width: 480px) {
+    font-size: 12px;
+    padding: 6px 12px;
+    max-width: 150px;
+  }
 `;
 
 const Controls = styled.div`
@@ -82,6 +107,12 @@ const Controls = styled.div`
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   gap: 16px;
   flex-wrap: wrap;
+  min-height: 80px;
+  
+  @media (max-width: 480px) {
+    padding: 15px;
+    gap: 12px;
+  }
 `;
 
 const ControlButton = styled.button`
@@ -96,13 +127,20 @@ const ControlButton = styled.button`
   align-items: center;
   justify-content: center;
   font-weight: 600;
+  touch-action: manipulation;
+  
+  @media (max-width: 480px) {
+    width: 48px;
+    height: 48px;
+    font-size: 18px;
+  }
   
   &.primary {
     background: linear-gradient(45deg, #ef4444, #dc2626);
     color: white;
     box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
     
-    &:hover {
+    &:hover:not(:disabled) {
       transform: translateY(-2px);
       box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
     }
@@ -113,7 +151,7 @@ const ControlButton = styled.button`
     color: white;
     box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
     
-    &:hover {
+    &:hover:not(:disabled) {
       transform: translateY(-2px);
       box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
     }
@@ -126,7 +164,7 @@ const ControlButton = styled.button`
     color: white;
     border: 2px solid ${props => props.active ? '#6366f1' : 'rgba(255, 255, 255, 0.3)'};
     
-    &:hover {
+    &:hover:not(:disabled) {
       background: ${props => props.active 
         ? 'linear-gradient(45deg, #4f46e5, #4338ca)' 
         : 'rgba(255, 255, 255, 0.3)'};
@@ -139,7 +177,7 @@ const ControlButton = styled.button`
     color: white;
     border: 2px solid rgba(107, 114, 128, 0.6);
     
-    &:hover {
+    &:hover:not(:disabled) {
       background: rgba(75, 85, 99, 0.9);
       transform: translateY(-1px);
     }
@@ -149,6 +187,10 @@ const ControlButton = styled.button`
     opacity: 0.5;
     cursor: not-allowed;
     transform: none;
+  }
+  
+  &:active {
+    transform: scale(0.95);
   }
 `;
 
@@ -161,18 +203,54 @@ const PlaceholderMessage = styled.div`
   color: rgba(255, 255, 255, 0.8);
   font-size: 18px;
   font-weight: 500;
+  padding: 20px;
+  
+  @media (max-width: 480px) {
+    font-size: 16px;
+    padding: 15px;
+  }
+`;
+
+const ErrorMessage = styled.div`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #ef4444;
+  font-size: 16px;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 20px;
+  border-radius: 12px;
+  max-width: 300px;
+  
+  button {
+    margin-top: 15px;
+    padding: 10px 20px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    
+    &:hover {
+      background: #dc2626;
+    }
+  }
 `;
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://omegle-clone-backend-production-8f06.up.railway.app';
 
-// Enhanced ICE servers configuration
+// Enhanced ICE servers with more reliable options
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' },
   { urls: 'stun:stun3.l.google.com:19302' },
   { urls: 'stun:stun4.l.google.com:19302' },
-  // Free TURN servers (replace with your own for production)
+  // Public TURN servers (replace with your own for production)
   {
     urls: 'turn:openrelay.metered.ca:80',
     username: 'openrelayproject',
@@ -181,6 +259,11 @@ const ICE_SERVERS = [
   {
     urls: 'turn:openrelay.metered.ca:443',
     username: 'openrelayproject', 
+    credential: 'openrelayproject'
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
     credential: 'openrelayproject'
   }
 ];
@@ -191,6 +274,7 @@ const VideoChat = ({ user, updateUser }) => {
   const remoteVideoRef = useRef();
   const socketRef = useRef();
   const peerConnectionRef = useRef();
+  const connectionTimeoutRef = useRef();
   
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
@@ -198,55 +282,74 @@ const VideoChat = ({ user, updateUser }) => {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
   
-  // Enhanced getUserMedia with better mobile support
+  // Enhanced getUserMedia with mobile optimizations
   const getUserMedia = useCallback(async () => {
     const constraints = {
       video: {
-        width: { min: 320, ideal: 720, max: 1280 },
+        width: { min: 320, ideal: 640, max: 1280 },
         height: { min: 240, ideal: 480, max: 720 },
-        frameRate: { min: 15, ideal: 24, max: 30 },
+        frameRate: { min: 10, ideal: 24, max: 30 },
         facingMode: 'user'
       },
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
-        sampleRate: 44100
+        sampleRate: { ideal: 44100 }
       }
     };
     
     try {
       console.log('🎥 Requesting media access...');
+      setConnectionStatus('Requesting camera/microphone access...');
+      
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setLocalStream(stream);
+      setError(null);
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
       
+      console.log('✅ Media access granted');
       return stream;
     } catch (error) {
       console.error('❌ Media access failed:', error);
       
-      // Fallback with lower quality
+      let errorMessage = 'Camera/microphone access failed. ';
+      if (error.name === 'NotAllowedError') {
+        errorMessage = 'Camera/microphone access denied. Please allow access and try again.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = 'No camera/microphone found. Please connect a device and try again.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = 'Camera/microphone is already in use by another application.';
+      }
+      
+      setError(errorMessage);
+      setConnectionStatus('Media access failed');
+      
+      // Try with fallback constraints
       try {
         const fallbackConstraints = {
-          video: { width: 320, height: 240 },
+          video: { width: 320, height: 240, frameRate: 15 },
           audio: true
         };
         const fallbackStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
         setLocalStream(fallbackStream);
+        setError(null);
         
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = fallbackStream;
         }
         
+        console.log('✅ Fallback media access granted');
         return fallbackStream;
       } catch (fallbackError) {
         console.error('❌ Fallback media access failed:', fallbackError);
-        setConnectionStatus('Camera/microphone access denied. Please allow access and refresh.');
-        throw fallbackError;
+        throw error;
       }
     }
   }, []);
@@ -257,14 +360,15 @@ const VideoChat = ({ user, updateUser }) => {
       iceServers: ICE_SERVERS,
       iceCandidatePoolSize: 10,
       bundlePolicy: 'max-bundle',
-      rtcpMuxPolicy: 'require'
+      rtcpMuxPolicy: 'require',
+      iceTransportPolicy: 'all'
     };
     
     const pc = new RTCPeerConnection(config);
     
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
-      if (event.candidate && socketRef.current) {
+      if (event.candidate && socketRef.current?.connected) {
         console.log('📡 Sending ICE candidate');
         socketRef.current.emit('ice-candidate', event.candidate);
       }
@@ -281,6 +385,8 @@ const VideoChat = ({ user, updateUser }) => {
       }
       
       setConnectionStatus('connected');
+      setIsConnecting(false);
+      clearTimeout(connectionTimeoutRef.current);
     };
     
     // Handle connection state changes
@@ -291,43 +397,89 @@ const VideoChat = ({ user, updateUser }) => {
         case 'connected':
           setConnectionStatus('connected');
           setIsConnecting(false);
+          setRetryCount(0);
+          clearTimeout(connectionTimeoutRef.current);
           break;
         case 'disconnected':
-        case 'failed':
-          setConnectionStatus('disconnected');
+          setConnectionStatus('Partner disconnected');
           setIsConnecting(false);
           setTimeout(() => findPartner(), 3000);
           break;
+        case 'failed':
+          setConnectionStatus('Connection failed');
+          setIsConnecting(false);
+          setTimeout(() => findPartner(), 2000);
+          break;
         case 'connecting':
-          setConnectionStatus('connecting');
+          setConnectionStatus('Connecting to partner...');
           setIsConnecting(true);
+          // Set connection timeout
+          connectionTimeoutRef.current = setTimeout(() => {
+            if (pc.connectionState === 'connecting') {
+              console.log('⏰ Connection timeout, trying next partner');
+              nextPartner();
+            }
+          }, 30000);
           break;
         default:
           break;
       }
     };
     
+    // Handle ICE connection state changes
+    pc.oniceconnectionstatechange = () => {
+      console.log('🧊 ICE connection state:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'failed') {
+        console.log('❌ ICE connection failed, retrying...');
+        if (retryCount < 3) {
+          setRetryCount(prev => prev + 1);
+          setTimeout(() => nextPartner(), 2000);
+        } else {
+          setConnectionStatus('Connection failed. Please refresh and try again.');
+        }
+      }
+    };
+    
     return pc;
-  }, []);
+  }, [retryCount]);
   
   // Initialize socket connection
   const initializeSocket = useCallback(() => {
+    if (socketRef.current?.connected) {
+      return; // Already connected
+    }
+    
     console.log('🌐 Connecting to signaling server...');
+    setConnectionStatus('Connecting to server...');
     
     socketRef.current = io(BACKEND_URL, {
       transports: ['websocket', 'polling'],
       timeout: 20000,
-      forceNew: true
+      forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
     });
     
     socketRef.current.on('connect', () => {
       console.log('✅ Connected to signaling server');
-      setConnectionStatus('Looking for partner...');
+      setConnectionStatus('Connected to server');
+      setError(null);
     });
     
-    socketRef.current.on('disconnect', () => {
-      console.log('❌ Disconnected from signaling server');
+    socketRef.current.on('disconnect', (reason) => {
+      console.log('❌ Disconnected from signaling server:', reason);
       setConnectionStatus('Disconnected from server');
+      if (reason === 'io server disconnect') {
+        // Server disconnected, try to reconnect
+        setTimeout(() => initializeSocket(), 3000);
+      }
+    });
+    
+    socketRef.current.on('connect_error', (error) => {
+      console.error('❌ Connection error:', error);
+      setConnectionStatus('Server connection failed');
+      setError('Failed to connect to server. Please check your internet connection.');
     });
     
     // Handle partner found
@@ -373,6 +525,9 @@ const VideoChat = ({ user, updateUser }) => {
       console.log('👋 Partner disconnected');
       setConnectionStatus('Partner disconnected');
       setRemoteStream(null);
+      setIsConnecting(false);
+      clearTimeout(connectionTimeoutRef.current);
+      
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = null;
       }
@@ -382,11 +537,20 @@ const VideoChat = ({ user, updateUser }) => {
         findPartner();
       }, 2000);
     });
+
+    // Handle errors
+    socketRef.current.on('error', (error) => {
+      console.error('❌ Socket error:', error);
+      setError('Connection error occurred');
+    });
   }, []);
   
   // Initiate a call (create offer)
   const initiateCall = useCallback(async () => {
-    if (!localStream || !socketRef.current) return;
+    if (!localStream || !socketRef.current?.connected) {
+      console.log('❌ Cannot initiate call: missing stream or socket');
+      return;
+    }
     
     try {
       peerConnectionRef.current = createPeerConnection();
@@ -410,12 +574,16 @@ const VideoChat = ({ user, updateUser }) => {
     } catch (error) {
       console.error('❌ Failed to initiate call:', error);
       setConnectionStatus('Failed to initiate call');
+      setTimeout(() => nextPartner(), 2000);
     }
   }, [localStream, createPeerConnection]);
   
   // Handle incoming offer
   const handleOffer = useCallback(async (offer) => {
-    if (!localStream) return;
+    if (!localStream) {
+      console.log('❌ Cannot handle offer: missing local stream');
+      return;
+    }
     
     try {
       peerConnectionRef.current = createPeerConnection();
@@ -437,12 +605,16 @@ const VideoChat = ({ user, updateUser }) => {
     } catch (error) {
       console.error('❌ Failed to handle offer:', error);
       setConnectionStatus('Failed to connect');
+      setTimeout(() => nextPartner(), 2000);
     }
   }, [localStream, createPeerConnection]);
   
   // Handle call answer
   const handleAnswer = useCallback(async (answer) => {
-    if (!peerConnectionRef.current) return;
+    if (!peerConnectionRef.current) {
+      console.log('❌ Cannot handle answer: no peer connection');
+      return;
+    }
     
     try {
       await peerConnectionRef.current.setRemoteDescription(answer);
@@ -454,7 +626,10 @@ const VideoChat = ({ user, updateUser }) => {
   
   // Handle ICE candidates
   const handleIceCandidate = useCallback(async (candidate) => {
-    if (!peerConnectionRef.current) return;
+    if (!peerConnectionRef.current) {
+      console.log('❌ Cannot handle ICE candidate: no peer connection');
+      return;
+    }
     
     try {
       await peerConnectionRef.current.addIceCandidate(candidate);
@@ -466,11 +641,17 @@ const VideoChat = ({ user, updateUser }) => {
   
   // Find a partner
   const findPartner = useCallback(() => {
-    if (!socketRef.current) return;
+    if (!socketRef.current?.connected) {
+      console.log('❌ Cannot find partner: not connected to server');
+      setTimeout(() => findPartner(), 3000);
+      return;
+    }
     
     console.log('🔍 Looking for partner...');
     setConnectionStatus('Looking for partner...');
     setIsConnecting(false);
+    setError(null);
+    clearTimeout(connectionTimeoutRef.current);
     
     // Clean up previous connection
     if (peerConnectionRef.current) {
@@ -483,12 +664,16 @@ const VideoChat = ({ user, updateUser }) => {
       remoteVideoRef.current.srcObject = null;
     }
     
-    socketRef.current.emit('findPartner', {
+    // Emit find partner with user data
+    const userData = {
       userId: user.id,
       gender: user.gender,
       preferredGender: user.preferredGender,
       hasFilterCredit: user.filterCredits > 0 || user.isPremium
-    });
+    };
+    
+    console.log('Sending user data:', userData);
+    socketRef.current.emit('findPartner', userData);
   }, [user]);
   
   // Toggle audio
@@ -498,6 +683,7 @@ const VideoChat = ({ user, updateUser }) => {
       if (audioTrack) {
         audioTrack.enabled = !audioEnabled;
         setAudioEnabled(!audioEnabled);
+        console.log(`🎤 Audio ${!audioEnabled ? 'enabled' : 'disabled'}`);
       }
     }
   }, [localStream, audioEnabled]);
@@ -509,6 +695,7 @@ const VideoChat = ({ user, updateUser }) => {
       if (videoTrack) {
         videoTrack.enabled = !videoEnabled;
         setVideoEnabled(!videoEnabled);
+        console.log(`📹 Video ${!videoEnabled ? 'enabled' : 'disabled'}`);
       }
     }
   }, [localStream, videoEnabled]);
@@ -517,12 +704,14 @@ const VideoChat = ({ user, updateUser }) => {
   const nextPartner = useCallback(() => {
     console.log('🔄 Finding next partner...');
     
+    clearTimeout(connectionTimeoutRef.current);
+    
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
     
-    if (socketRef.current) {
+    if (socketRef.current?.connected) {
       socketRef.current.emit('endCall');
     }
     
@@ -540,9 +729,14 @@ const VideoChat = ({ user, updateUser }) => {
   const stopCall = useCallback(() => {
     console.log('🛑 Stopping call');
     
+    clearTimeout(connectionTimeoutRef.current);
+    
     // Stop local stream
     if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
+      localStream.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
     }
     
     // Close peer connection
@@ -551,13 +745,20 @@ const VideoChat = ({ user, updateUser }) => {
     }
     
     // Disconnect socket
-    if (socketRef.current) {
+    if (socketRef.current?.connected) {
       socketRef.current.emit('endCall');
       socketRef.current.disconnect();
     }
     
     navigate('/');
   }, [localStream, navigate]);
+  
+  // Retry connection
+  const retryConnection = useCallback(() => {
+    setError(null);
+    setRetryCount(0);
+    initializeSocket();
+  }, [initializeSocket]);
   
   // Initialize everything
   useEffect(() => {
@@ -574,15 +775,23 @@ const VideoChat = ({ user, updateUser }) => {
     
     // Cleanup on unmount
     return () => {
+      console.log('🧹 Cleaning up VideoChat component');
+      
+      clearTimeout(connectionTimeoutRef.current);
+      
       if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
+        localStream.getTracks().forEach(track => {
+          track.stop();
+          track.enabled = false;
+        });
       }
       
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
       }
       
-      if (socketRef.current) {
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('endCall');
         socketRef.current.disconnect();
       }
     };
@@ -590,15 +799,39 @@ const VideoChat = ({ user, updateUser }) => {
   
   // Auto-find partner when local stream is ready
   useEffect(() => {
-    if (localStream && socketRef.current && socketRef.current.connected) {
-      findPartner();
+    if (localStream && socketRef.current?.connected && !isConnecting && connectionStatus !== 'connected') {
+      console.log('🚀 Auto-finding partner...');
+      setTimeout(() => findPartner(), 1000);
     }
-  }, [localStream, findPartner]);
+  }, [localStream, findPartner, isConnecting, connectionStatus]);
+  
+  // Redirect to home if no user data
+  useEffect(() => {
+    if (!user.id || !user.gender) {
+      console.log('❌ No user data, redirecting to home');
+      navigate('/');
+    }
+  }, [user, navigate]);
+  
+  if (error && error.includes('Camera/microphone')) {
+    return (
+      <Container>
+        <ErrorMessage>
+          <div>❌ {error}</div>
+          <button onClick={() => window.location.reload()}>
+            Refresh Page
+          </button>
+        </ErrorMessage>
+      </Container>
+    );
+  }
   
   return (
     <Container>
-      <ConnectionStatus status={connectionStatus.includes('connected') ? 'connected' : 
-        connectionStatus.includes('connecting') || connectionStatus.includes('Looking') ? 'connecting' : 'disconnected'}>
+      <ConnectionStatus status={
+        connectionStatus.includes('connected') ? 'connected' : 
+        connectionStatus.includes('connecting') || connectionStatus.includes('Looking') || isConnecting ? 'connecting' : 'disconnected'
+      }>
         {connectionStatus}
       </ConnectionStatus>
       
@@ -609,8 +842,9 @@ const VideoChat = ({ user, updateUser }) => {
             autoPlay
             muted
             playsInline
+            poster="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjI0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMDAwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkxvYWRpbmcuLi48L3RleHQ+PC9zdmc+"
           />
-          <VideoLabel>You</VideoLabel>
+          <VideoLabel>You {!videoEnabled && '(Camera Off)'}</VideoLabel>
         </VideoWrapper>
         
         <VideoWrapper>
@@ -619,10 +853,14 @@ const VideoChat = ({ user, updateUser }) => {
               ref={remoteVideoRef}
               autoPlay
               playsInline
+              poster="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIwIiBoZWlnaHQ9IjI0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMDAwIi8+PC9zdmc+"
             />
           ) : (
             <PlaceholderMessage>
-              {isConnecting ? '🔄 Connecting...' : '👋 Waiting for partner...'}
+              {isConnecting ? '🔄 Connecting...' : 
+               error ? '❌ Connection error' :
+               connectionStatus.includes('Looking') ? '👋 Looking for partner...' : 
+               '💭 Waiting for partner...'}
             </PlaceholderMessage>
           )}
           <VideoLabel>Partner</VideoLabel>
@@ -635,6 +873,7 @@ const VideoChat = ({ user, updateUser }) => {
           active={audioEnabled}
           onClick={toggleAudio}
           title={audioEnabled ? 'Mute audio' : 'Unmute audio'}
+          disabled={!localStream}
         >
           {audioEnabled ? '🎤' : '🔇'}
         </ControlButton>
@@ -644,6 +883,7 @@ const VideoChat = ({ user, updateUser }) => {
           active={videoEnabled}
           onClick={toggleVideo}
           title={videoEnabled ? 'Turn off camera' : 'Turn on camera'}
+          disabled={!localStream}
         >
           {videoEnabled ? '📹' : '📷'}
         </ControlButton>
@@ -659,11 +899,21 @@ const VideoChat = ({ user, updateUser }) => {
         <ControlButton
           className="secondary"
           onClick={nextPartner}
-          disabled={isConnecting}
+          disabled={isConnecting || !localStream}
           title="Find next partner"
         >
-          🔄
+          {isConnecting ? '⏳' : '🔄'}
         </ControlButton>
+        
+        {error && !error.includes('Camera/microphone') && (
+          <ControlButton
+            className="control"
+            onClick={retryConnection}
+            title="Retry connection"
+          >
+            🔁
+          </ControlButton>
+        )}
       </Controls>
     </Container>
   );
