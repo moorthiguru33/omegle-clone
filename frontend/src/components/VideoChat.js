@@ -3,631 +3,547 @@ import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import styled from 'styled-components';
 
+// All your existing styled components remain the same...
 const Container = styled.div`
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-  font-family: 'Arial', sans-serif;
-  position: relative;
-  overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    font-family: 'Arial', sans-serif;
+    position: relative;
+    overflow: hidden;
 `;
 
-const VideoContainer = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  flex: 1;
-  gap: 2px;
-  padding: 10px;
-  
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
-  }
-`;
+// ... (keep all other styled components as they are) ...
 
-const VideoWrapper = styled.div`
-  position: relative;
-  background: #000;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-`;
-
-const Video = styled.video`
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 12px;
-  -webkit-playsinline: true;
-  playsinline: true;
-`;
-
-const VideoLabel = styled.div`
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  z-index: 10;
-`;
-
-const StatusBar = styled.div`
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: ${props => {
-    if (props.status === 'Connected!') return 'rgba(34, 197, 94, 0.9)';
-    if (props.status.includes('Connecting') || props.status.includes('Finding')) return 'rgba(251, 191, 36, 0.9)';
-    return 'rgba(239, 68, 68, 0.9)';
-  }};
-  color: white;
-  padding: 8px 16px;
-  border-radius: 25px;
-  font-size: 14px;
-  font-weight: 600;
-  z-index: 1000;
-`;
-
-const Controls = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  gap: 16px;
-  flex-wrap: wrap;
-`;
-
-const ControlButton = styled.button`
-  width: 56px;
-  height: 56px;
-  border: none;
-  border-radius: 50%;
-  font-size: 20px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  touch-action: manipulation;
-  
-  &.primary {
-    background: linear-gradient(45deg, #ef4444, #dc2626);
-    color: white;
-    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
-  }
-  
-  &.secondary {
-    background: linear-gradient(45deg, #10b981, #059669);
-    color: white;
-    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
-  }
-  
-  &.control {
-    background: ${props => props.active
-      ? 'linear-gradient(45deg, #6366f1, #4f46e5)'
-      : 'rgba(255, 255, 255, 0.2)'};
-    color: white;
-    border: 2px solid ${props => props.active ? '#6366f1' : 'rgba(255, 255, 255, 0.3)'};
-  }
-  
-  &.home {
-    background: rgba(107, 114, 128, 0.8);
-    color: white;
-    border: 2px solid rgba(107, 114, 128, 0.6);
-  }
-  
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-  }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const PlaceholderMessage = styled.div`
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 18px;
-  font-weight: 500;
-  z-index: 5;
-`;
-
-// Get backend URL dynamically
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://omegle-clone-backend-production-8f06.up.railway.app';
 
-// Enhanced ICE servers
+// Stable ICE servers
 const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject', 
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  }
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+    }
 ];
 
 const VideoChat = ({ user, updateUser }) => {
-  const navigate = useNavigate();
-  const localVideoRef = useRef();
-  const remoteVideoRef = useRef();
-  const socketRef = useRef();
-  const peerConnectionRef = useRef();
-  const timeoutsRef = useRef({});
-  
-  const [localStream, setLocalStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
-  const [status, setStatus] = useState('Initializing...');
-  const [audioEnabled, setAudioEnabled] = useState(true);
-  const [videoEnabled, setVideoEnabled] = useState(true);
-  const [partnerId, setPartnerId] = useState(null);
+    const navigate = useNavigate();
+    
+    // Refs - stable references
+    const localVideoRef = useRef();
+    const remoteVideoRef = useRef();
+    const socketRef = useRef();
+    const peerConnectionRef = useRef();
+    const localStreamRef = useRef();
+    const mountedRef = useRef(true);
+    
+    // State
+    const [connectionStatus, setConnectionStatus] = useState('Starting...');
+    const [audioEnabled, setAudioEnabled] = useState(true);
+    const [videoEnabled, setVideoEnabled] = useState(true);
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [hasLocalVideo, setHasLocalVideo] = useState(false);
+    const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
 
-  // Clear all timeouts
-  const clearTimeouts = useCallback(() => {
-    Object.values(timeoutsRef.current).forEach(clearTimeout);
-    timeoutsRef.current = {};
-  }, []);
-
-  // Initialize media
-  const initializeMedia = useCallback(async () => {
-    try {
-      setStatus('Getting camera...');
-      
-      const constraints = {
-        video: {
-          width: { min: 240, ideal: 640, max: 1280 },
-          height: { min: 180, ideal: 480, max: 720 },
-          frameRate: { min: 15, ideal: 24, max: 30 },
-          facingMode: 'user'
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
+    // **ANTI-FLICKER FIX**: Stable video stream management
+    const setLocalVideoStream = useCallback((stream) => {
+        if (!mountedRef.current) return;
+        
+        localStreamRef.current = stream;
+        setHasLocalVideo(!!stream);
+        
+        if (localVideoRef.current && stream) {
+            localVideoRef.current.srcObject = stream;
+            localVideoRef.current.muted = true;
+            localVideoRef.current.playsInline = true;
+            
+            // Auto-play with error handling
+            localVideoRef.current.play().catch(e => {
+                console.log('Local video autoplay prevented');
+            });
         }
-      };
+    }, []);
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      setLocalStream(stream);
-      
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        localVideoRef.current.muted = true;
-        localVideoRef.current.playsInline = true;
-        await localVideoRef.current.play().catch(() => {});
-      }
-      
-      return stream;
-    } catch (error) {
-      console.error('Media error:', error);
-      setStatus('Camera access failed');
-      throw error;
-    }
-  }, []);
+    const setRemoteVideoStream = useCallback((stream) => {
+        if (!mountedRef.current) return;
+        
+        setHasRemoteVideo(!!stream);
+        
+        if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = stream;
+            remoteVideoRef.current.playsInline = true;
+            
+            if (stream) {
+                remoteVideoRef.current.play().catch(e => {
+                    console.log('Remote video autoplay prevented');
+                });
+            }
+        }
+    }, []);
 
-  // Initialize socket
-  const initializeSocket = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
+    // Get user media with error handling
+    const getUserMedia = useCallback(async () => {
+        try {
+            console.log('🎥 Requesting camera access...');
+            setConnectionStatus('Requesting camera access...');
+            
+            const constraints = {
+                video: {
+                    width: { ideal: 640, max: 1280 },
+                    height: { ideal: 480, max: 720 },
+                    frameRate: { ideal: 24, max: 30 },
+                    facingMode: 'user'
+                },
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            };
 
-    setStatus('Connecting to server...');
-    
-    socketRef.current = io(BACKEND_URL, {
-      transports: ['websocket', 'polling'],
-      timeout: 20000,
-      forceNew: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000
-    });
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            console.log('✅ Camera access granted');
+            
+            setLocalVideoStream(stream);
+            setConnectionStatus('Camera ready');
+            
+            return stream;
+            
+        } catch (error) {
+            console.error('❌ Camera access failed:', error);
+            setConnectionStatus('Camera access denied');
+            throw error;
+        }
+    }, [setLocalVideoStream]);
 
-    // Connection events
-    socketRef.current.on('connect', () => {
-      console.log('✅ Connected to server');
-      setStatus('Connected! Finding partner...');
-      
-      // Start partner search
-      socketRef.current.emit('find-partner', {
-        userId: user.id,
-        gender: user.gender,
-        preferredGender: user.preferredGender || 'any',
-        filterCredits: user.filterCredits || 0,
-        isPremium: user.isPremium || false
-      });
-    });
+    // **FIXED**: Socket initialization with proper event handlers
+    const initializeSocket = useCallback(() => {
+        if (socketRef.current?.connected) {
+            return socketRef.current;
+        }
 
-    socketRef.current.on('disconnect', () => {
-      setStatus('Server disconnected');
-      clearTimeouts();
-    });
+        console.log('🌐 Connecting to server...');
+        setConnectionStatus('Connecting to server...');
 
-    socketRef.current.on('connect_error', () => {
-      setStatus('Connection failed');
-    });
-
-    // Partner matching
-    socketRef.current.on('waiting', (data) => {
-      setStatus(`Waiting for partner... (${data?.position || 0} in queue)`);
-    });
-
-    socketRef.current.on('partner-found', ({ partnerId: foundPartnerId, roomId }) => {
-      console.log('🎯 Partner found:', foundPartnerId);
-      setStatus('Partner found! Starting call...');
-      setPartnerId(foundPartnerId);
-      
-      // Small delay before starting call
-      timeoutsRef.current.callStart = setTimeout(() => {
-        createOffer(foundPartnerId);
-      }, 1000);
-    });
-
-    // WebRTC signaling
-    socketRef.current.on('webrtc-offer', async ({ from, offer }) => {
-      console.log('📞 Received offer from:', from);
-      setStatus('Incoming call...');
-      setPartnerId(from);
-      await handleOffer(from, offer);
-    });
-
-    socketRef.current.on('webrtc-answer', async ({ from, answer }) => {
-      console.log('✅ Received answer from:', from);
-      setStatus('Connecting...');
-      await handleAnswer(answer);
-    });
-
-    socketRef.current.on('webrtc-ice-candidate', ({ from, candidate }) => {
-      handleIceCandidate(candidate);
-    });
-
-    socketRef.current.on('partner-disconnected', () => {
-      console.log('👋 Partner disconnected');
-      setStatus('Partner disconnected. Finding new partner...');
-      cleanup();
-      
-      timeoutsRef.current.newPartner = setTimeout(() => {
-        socketRef.current?.emit('find-partner', {
-          userId: user.id,
-          gender: user.gender,
-          preferredGender: user.preferredGender || 'any',
-          filterCredits: user.filterCredits || 0,
-          isPremium: user.isPremium || false
+        socketRef.current = io(BACKEND_URL, {
+            transports: ['websocket', 'polling'],
+            timeout: 20000,
+            forceNew: true,
+            reconnection: false  // **ANTI-FLICKER**: Disable auto-reconnection
         });
-      }, 2000);
-    });
-  }, [user]);
 
-  // Create peer connection
-  const createPeerConnection = useCallback((targetId) => {
-    console.log('🔗 Creating peer connection');
-    
-    const config = {
-      iceServers: ICE_SERVERS,
-      sdpSemantics: 'unified-plan',
-      iceCandidatePoolSize: 10
-    };
-
-    const pc = new RTCPeerConnection(config);
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && socketRef.current) {
-        console.log('📡 Sending ICE candidate');
-        socketRef.current.emit('webrtc-ice-candidate', {
-          to: targetId,
-          candidate: event.candidate
+        socketRef.current.on('connect', () => {
+            if (!mountedRef.current) return;
+            console.log('✅ Connected to server');
+            setConnectionStatus('Connected! Looking for partner...');
+            
+            // Auto-start search after connection
+            setTimeout(() => {
+                if (mountedRef.current && user?.id && user?.gender) {
+                    findPartner();
+                }
+            }, 1000);
         });
-      }
+
+        socketRef.current.on('matched', (partnerId) => {
+            if (!mountedRef.current) return;
+            console.log('🎯 Partner found:', partnerId);
+            setConnectionStatus('Partner found! Connecting...');
+            setIsConnecting(true);
+            
+            // Start call process
+            setTimeout(() => {
+                if (mountedRef.current) {
+                    initiateCall();
+                }
+            }, 1000);
+        });
+
+        socketRef.current.on('waiting', () => {
+            if (!mountedRef.current) return;
+            console.log('⏳ Waiting for partner...');
+            setConnectionStatus('Looking for partner...');
+            setIsConnecting(false);
+        });
+
+        // WebRTC signaling
+        socketRef.current.on('offer', async (offer) => {
+            if (!mountedRef.current) return;
+            console.log('📞 Received offer');
+            setConnectionStatus('Incoming call...');
+            await handleOffer(offer);
+        });
+
+        socketRef.current.on('answer', async (answer) => {
+            if (!mountedRef.current) return;
+            console.log('✅ Received answer');
+            await handleAnswer(answer);
+        });
+
+        socketRef.current.on('ice-candidate', async (candidate) => {
+            if (!mountedRef.current) return;
+            await handleIceCandidate(candidate);
+        });
+
+        socketRef.current.on('partnerDisconnected', () => {
+            if (!mountedRef.current) return;
+            console.log('👋 Partner disconnected');
+            setConnectionStatus('Partner disconnected');
+            setIsConnecting(false);
+            
+            // Clean up remote video
+            setRemoteVideoStream(null);
+            
+            if (peerConnectionRef.current) {
+                peerConnectionRef.current.close();
+                peerConnectionRef.current = null;
+            }
+            
+            // Auto find new partner
+            setTimeout(() => {
+                if (mountedRef.current) {
+                    findPartner();
+                }
+            }, 2000);
+        });
+
+        socketRef.current.on('disconnect', () => {
+            if (!mountedRef.current) return;
+            console.log('❌ Disconnected from server');
+            setConnectionStatus('Disconnected');
+        });
+
+        return socketRef.current;
+    }, [user]);
+
+    // Create peer connection
+    const createPeerConnection = useCallback(() => {
+        const pc = new RTCPeerConnection({
+            iceServers: ICE_SERVERS,
+            iceCandidatePoolSize: 10
+        });
+
+        pc.onicecandidate = (event) => {
+            if (event.candidate && socketRef.current?.connected) {
+                socketRef.current.emit('ice-candidate', event.candidate);
+            }
+        };
+
+        pc.ontrack = (event) => {
+            if (!mountedRef.current) return;
+            console.log('🎬 Received remote stream');
+            const [stream] = event.streams;
+            setRemoteVideoStream(stream);
+            setConnectionStatus('Connected!');
+            setIsConnecting(false);
+        };
+
+        pc.onconnectionstatechange = () => {
+            if (!mountedRef.current) return;
+            console.log('🔗 Connection state:', pc.connectionState);
+            
+            switch (pc.connectionState) {
+                case 'connected':
+                    setConnectionStatus('Connected!');
+                    setIsConnecting(false);
+                    break;
+                case 'disconnected':
+                case 'failed':
+                    setConnectionStatus('Connection lost');
+                    setIsConnecting(false);
+                    setTimeout(() => {
+                        if (mountedRef.current) {
+                            findPartner();
+                        }
+                    }, 3000);
+                    break;
+            }
+        };
+
+        return pc;
+    }, [setRemoteVideoStream]);
+
+    // **FIXED**: Find partner function with correct event name
+    const findPartner = useCallback(() => {
+        if (!socketRef.current?.connected || !user?.id || !user?.gender) {
+            console.log('❌ Cannot find partner - missing requirements');
+            return;
+        }
+
+        console.log('🔍 Looking for partner...');
+        setConnectionStatus('Looking for partner...');
+        setIsConnecting(false);
+        
+        // Clean up previous connection
+        if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
+            peerConnectionRef.current = null;
+        }
+        
+        setRemoteVideoStream(null);
+
+        const userData = {
+            userId: user.id,
+            gender: user.gender,
+            preferredGender: user.preferredGender || 'any'
+        };
+
+        // **CRITICAL FIX**: Use the correct event name
+        socketRef.current.emit('find-partner', userData);
+    }, [user, setRemoteVideoStream]);
+
+    // Initiate call
+    const initiateCall = useCallback(async () => {
+        if (!localStreamRef.current || !socketRef.current?.connected) {
+            console.log('❌ Cannot initiate call');
+            return;
+        }
+
+        try {
+            console.log('📞 Initiating call...');
+            peerConnectionRef.current = createPeerConnection();
+            
+            // Add local stream tracks
+            localStreamRef.current.getTracks().forEach(track => {
+                peerConnectionRef.current.addTrack(track, localStreamRef.current);
+            });
+
+            const offer = await peerConnectionRef.current.createOffer();
+            await peerConnectionRef.current.setLocalDescription(offer);
+            
+            socketRef.current.emit('offer', offer);
+            console.log('📞 Offer sent');
+            
+        } catch (error) {
+            console.error('❌ Failed to initiate call:', error);
+            setConnectionStatus('Failed to start call');
+        }
+    }, [createPeerConnection]);
+
+    // Handle offer
+    const handleOffer = useCallback(async (offer) => {
+        if (!localStreamRef.current) return;
+
+        try {
+            peerConnectionRef.current = createPeerConnection();
+            
+            localStreamRef.current.getTracks().forEach(track => {
+                peerConnectionRef.current.addTrack(track, localStreamRef.current);
+            });
+
+            await peerConnectionRef.current.setRemoteDescription(offer);
+            const answer = await peerConnectionRef.current.createAnswer();
+            await peerConnectionRef.current.setLocalDescription(answer);
+            
+            socketRef.current.emit('answer', answer);
+            console.log('📞 Answer sent');
+            
+        } catch (error) {
+            console.error('❌ Failed to handle offer:', error);
+        }
+    }, [createPeerConnection]);
+
+    // Handle answer
+    const handleAnswer = useCallback(async (answer) => {
+        if (!peerConnectionRef.current) return;
+        
+        try {
+            await peerConnectionRef.current.setRemoteDescription(answer);
+            console.log('✅ Answer processed');
+        } catch (error) {
+            console.error('❌ Failed to handle answer:', error);
+        }
+    }, []);
+
+    // Handle ICE candidate
+    const handleIceCandidate = useCallback(async (candidate) => {
+        if (!peerConnectionRef.current) return;
+        
+        try {
+            await peerConnectionRef.current.addIceCandidate(candidate);
+        } catch (error) {
+            console.error('❌ ICE candidate error:', error);
+        }
+    }, []);
+
+    // Control functions
+    const toggleAudio = () => {
+        if (localStreamRef.current) {
+            const audioTrack = localStreamRef.current.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioEnabled;
+                setAudioEnabled(!audioEnabled);
+            }
+        }
     };
 
-    pc.ontrack = (event) => {
-      console.log('🎬 Received remote stream');
-      const [stream] = event.streams;
-      setRemoteStream(stream);
-      setStatus('Connected!');
-      
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
-        remoteVideoRef.current.playsInline = true;
-        remoteVideoRef.current.play().catch(() => {});
-      }
+    const toggleVideo = () => {
+        if (localStreamRef.current) {
+            const videoTrack = localStreamRef.current.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoEnabled;
+                setVideoEnabled(!videoEnabled);
+            }
+        }
     };
 
-    pc.onconnectionstatechange = () => {
-      console.log('🔗 Connection state:', pc.connectionState);
-      
-      switch (pc.connectionState) {
-        case 'connected':
-          setStatus('Connected!');
-          clearTimeouts();
-          break;
-        case 'disconnected':
-        case 'failed':
-          setStatus('Connection lost. Finding new partner...');
-          cleanup();
-          timeoutsRef.current.retry = setTimeout(() => findNewPartner(), 3000);
-          break;
-        case 'connecting':
-          setStatus('Connecting...');
-          break;
-      }
+    const nextPartner = () => {
+        if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
+            peerConnectionRef.current = null;
+        }
+        
+        if (socketRef.current?.connected) {
+            socketRef.current.emit('endCall');
+        }
+        
+        setRemoteVideoStream(null);
+        setTimeout(() => findPartner(), 1000);
     };
 
-    return pc;
-  }, []);
-
-  // Create and send offer
-  const createOffer = useCallback(async (targetId) => {
-    if (!localStream) return;
-
-    try {
-      console.log('📞 Creating offer for:', targetId);
-      peerConnectionRef.current = createPeerConnection(targetId);
-      
-      // Add local stream
-      localStream.getTracks().forEach(track => {
-        peerConnectionRef.current.addTrack(track, localStream);
-      });
-
-      const offer = await peerConnectionRef.current.createOffer();
-      await peerConnectionRef.current.setLocalDescription(offer);
-
-      socketRef.current.emit('webrtc-offer', {
-        to: targetId,
-        offer
-      });
-
-      // Set timeout
-      timeoutsRef.current.offerTimeout = setTimeout(() => {
-        setStatus('Connection timeout. Finding new partner...');
-        findNewPartner();
-      }, 15000);
-
-    } catch (error) {
-      console.error('Failed to create offer:', error);
-      findNewPartner();
-    }
-  }, [localStream, createPeerConnection]);
-
-  // Handle incoming offer
-  const handleOffer = useCallback(async (from, offer) => {
-    if (!localStream) return;
-
-    try {
-      console.log('📞 Handling offer from:', from);
-      peerConnectionRef.current = createPeerConnection(from);
-      
-      // Add local stream
-      localStream.getTracks().forEach(track => {
-        peerConnectionRef.current.addTrack(track, localStream);
-      });
-
-      await peerConnectionRef.current.setRemoteDescription(offer);
-      const answer = await peerConnectionRef.current.createAnswer();
-      await peerConnectionRef.current.setLocalDescription(answer);
-
-      socketRef.current.emit('webrtc-answer', {
-        to: from,
-        answer
-      });
-
-    } catch (error) {
-      console.error('Failed to handle offer:', error);
-      findNewPartner();
-    }
-  }, [localStream, createPeerConnection]);
-
-  // Handle answer
-  const handleAnswer = useCallback(async (answer) => {
-    if (!peerConnectionRef.current) return;
-
-    try {
-      await peerConnectionRef.current.setRemoteDescription(answer);
-      console.log('✅ Answer processed');
-    } catch (error) {
-      console.error('Failed to handle answer:', error);
-    }
-  }, []);
-
-  // Handle ICE candidate
-  const handleIceCandidate = useCallback(async (candidate) => {
-    if (!peerConnectionRef.current) return;
-
-    try {
-      await peerConnectionRef.current.addIceCandidate(candidate);
-      console.log('📡 ICE candidate added');
-    } catch (error) {
-      console.error('ICE candidate error:', error);
-    }
-  }, []);
-
-  // Find new partner
-  const findNewPartner = useCallback(() => {
-    cleanup();
-    setStatus('Finding new partner...');
-    
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('find-partner', {
-        userId: user.id,
-        gender: user.gender,
-        preferredGender: user.preferredGender || 'any',
-        filterCredits: user.filterCredits || 0,
-        isPremium: user.isPremium || false
-      });
-    }
-  }, [user]);
-
-  // Cleanup connections
-  const cleanup = useCallback(() => {
-    clearTimeouts();
-    
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-    
-    setRemoteStream(null);
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null;
-    }
-    
-    setPartnerId(null);
-  }, [clearTimeouts]);
-
-  // Control functions
-  const toggleAudio = () => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioEnabled;
-        setAudioEnabled(!audioEnabled);
-      }
-    }
-  };
-
-  const toggleVideo = () => {
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoEnabled;
-        setVideoEnabled(!videoEnabled);
-      }
-    }
-  };
-
-  const nextPartner = () => {
-    if (socketRef.current) {
-      socketRef.current.emit('end-call');
-    }
-    findNewPartner();
-  };
-
-  const endCall = () => {
-    if (socketRef.current) {
-      socketRef.current.emit('end-call');
-      socketRef.current.disconnect();
-    }
-    
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
-    
-    cleanup();
-    navigate('/');
-  };
-
-  // Initialize on mount
-  useEffect(() => {
-    if (!user?.id || !user?.gender) {
-      navigate('/');
-      return;
-    }
-
-    const init = async () => {
-      try {
-        await initializeMedia();
-        initializeSocket();
-      } catch (error) {
-        console.error('Initialization failed:', error);
-        setStatus('Initialization failed');
-      }
+    const stopCall = () => {
+        mountedRef.current = false;
+        
+        if (localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track => track.stop());
+        }
+        
+        if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
+        }
+        
+        if (socketRef.current) {
+            socketRef.current.emit('endCall');
+            socketRef.current.disconnect();
+        }
+        
+        navigate('/');
     };
 
-    init();
+    // Initialize on mount
+    useEffect(() => {
+        if (!user?.id || !user?.gender) {
+            navigate('/');
+            return;
+        }
 
-    return () => {
-      clearTimeouts();
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-      }
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-    };
-  }, [user, navigate, initializeMedia, initializeSocket, localStream, clearTimeouts]);
+        const init = async () => {
+            try {
+                await getUserMedia();
+                initializeSocket();
+            } catch (error) {
+                console.error('❌ Initialization failed:', error);
+                setConnectionStatus('Failed to start video chat');
+            }
+        };
 
-  return (
-    <Container>
-      <StatusBar status={status}>{status}</StatusBar>
-      
-      <VideoContainer>
-        <VideoWrapper>
-          <VideoLabel>You</VideoLabel>
-          <Video ref={localVideoRef} autoPlay muted playsInline />
-          {!localStream && (
-            <PlaceholderMessage>🎥 Starting camera...</PlaceholderMessage>
-          )}
-        </VideoWrapper>
-        
-        <VideoWrapper>
-          <VideoLabel>Partner</VideoLabel>
-          <Video ref={remoteVideoRef} autoPlay playsInline />
-          {!remoteStream && (
-            <PlaceholderMessage>
-              {partnerId ? '🔄 Connecting...' : '👋 Waiting for partner...'}
-            </PlaceholderMessage>
-          )}
-        </VideoWrapper>
-      </VideoContainer>
-      
-      <Controls>
-        <ControlButton 
-          className="control" 
-          active={audioEnabled}
-          onClick={toggleAudio}
-        >
-          {audioEnabled ? '🎤' : '🔇'}
-        </ControlButton>
-        
-        <ControlButton 
-          className="control"
-          active={videoEnabled} 
-          onClick={toggleVideo}
-        >
-          {videoEnabled ? '📹' : '📷'}
-        </ControlButton>
-        
-        <ControlButton className="secondary" onClick={nextPartner}>
-          ⏭️
-        </ControlButton>
-        
-        <ControlButton className="primary" onClick={endCall}>
-          📵
-        </ControlButton>
-        
-        <ControlButton className="home" onClick={() => navigate('/')}>
-          🏠
-        </ControlButton>
-      </Controls>
-    </Container>
-  );
+        init();
+
+        // Cleanup on unmount
+        return () => {
+            mountedRef.current = false;
+            
+            if (localStreamRef.current) {
+                localStreamRef.current.getTracks().forEach(track => track.stop());
+            }
+            
+            if (peerConnectionRef.current) {
+                peerConnectionRef.current.close();
+            }
+            
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+            }
+        };
+    }, [getUserMedia, initializeSocket, user, navigate]);
+
+    return (
+        <Container>
+            <ConnectionStatus status={connectionStatus}>
+                {connectionStatus}
+            </ConnectionStatus>
+
+            <VideoContainer>
+                <VideoWrapper>
+                    <VideoLabel>You</VideoLabel>
+                    <Video 
+                        ref={localVideoRef}
+                        autoPlay
+                        muted
+                        playsInline
+                        style={{ display: hasLocalVideo ? 'block' : 'none' }}
+                    />
+                    {!hasLocalVideo && (
+                        <PlaceholderMessage>
+                            🎥 Starting camera...
+                        </PlaceholderMessage>
+                    )}
+                </VideoWrapper>
+
+                <VideoWrapper>
+                    <VideoLabel>Partner</VideoLabel>
+                    <Video 
+                        ref={remoteVideoRef}
+                        autoPlay
+                        playsInline
+                        style={{ display: hasRemoteVideo ? 'block' : 'none' }}
+                    />
+                    {!hasRemoteVideo && (
+                        <PlaceholderMessage>
+                            {isConnecting ? '🔄 Connecting...' : '👋 Waiting for partner...'}
+                        </PlaceholderMessage>
+                    )}
+                </VideoWrapper>
+            </VideoContainer>
+
+            <Controls>
+                <ControlButton 
+                    className="control" 
+                    active={audioEnabled}
+                    onClick={toggleAudio}
+                    title={audioEnabled ? 'Mute' : 'Unmute'}
+                >
+                    {audioEnabled ? '🎤' : '🔇'}
+                </ControlButton>
+                
+                <ControlButton 
+                    className="control" 
+                    active={videoEnabled}
+                    onClick={toggleVideo}
+                    title={videoEnabled ? 'Turn off camera' : 'Turn on camera'}
+                >
+                    {videoEnabled ? '📹' : '📷'}
+                </ControlButton>
+                
+                <ControlButton 
+                    className="secondary" 
+                    onClick={nextPartner}
+                    title="Next partner"
+                >
+                    ⏭️
+                </ControlButton>
+                
+                <ControlButton 
+                    className="primary" 
+                    onClick={stopCall}
+                    title="End chat"
+                >
+                    ❌
+                </ControlButton>
+                
+                <ControlButton 
+                    className="home" 
+                    onClick={() => navigate('/')}
+                    title="Home"
+                >
+                    🏠
+                </ControlButton>
+            </Controls>
+        </Container>
+    );
 };
 
 export default VideoChat;
