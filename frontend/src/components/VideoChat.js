@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import styled from 'styled-components';
 
+// Your existing styled components remain the same...
 const Container = styled.div`
   display: flex;
   flex-direction: column;
@@ -168,38 +169,22 @@ const PlaceholderMessage = styled.div`
   z-index: 5;
 `;
 
-const ErrorMessage = styled.div`
-  position: absolute;
-  top: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(239, 68, 68, 0.9);
-  color: white;
-  padding: 12px 20px;
-  border-radius: 25px;
-  font-size: 14px;
-  font-weight: 600;
-  z-index: 1001;
-  max-width: 90%;
-  text-align: center;
-`;
-
 const DebugInfo = styled.div`
   position: absolute;
   bottom: 20px;
   left: 20px;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.8);
   color: white;
-  padding: 8px 12px;
+  padding: 10px;
   border-radius: 8px;
   font-size: 12px;
   font-family: monospace;
-  z-index: 1000;
-  max-width: 200px;
+  max-width: 250px;
   word-break: break-all;
+  z-index: 1000;
 `;
 
-// Use your actual Railway backend URL
+// Use your Railway backend URL
 const BACKEND_URL = 'https://omegle-clone-backend-production-8f06.up.railway.app';
 
 // Enhanced ICE servers
@@ -209,11 +194,6 @@ const ICE_SERVERS = [
   { urls: 'stun:stun2.l.google.com:19302' },
   {
     urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
     username: 'openrelayproject',
     credential: 'openrelayproject'
   }
@@ -228,18 +208,27 @@ const VideoChat = ({ user, updateUser }) => {
   
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('initializing');
+  const [connectionStatus, setConnectionStatus] = useState('Initializing...');
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState(null);
-  const [debugInfo, setDebugInfo] = useState('');
+  const [debugInfo, setDebugInfo] = useState('Starting...');
 
-  // Enhanced getUserMedia with better error handling
+  // Validate user data on component mount
+  useEffect(() => {
+    if (!user || !user.id || !user.gender) {
+      console.log('❌ Invalid user data, redirecting to home');
+      navigate('/');
+      return;
+    }
+    console.log('✅ User data validated:', user);
+  }, [user, navigate]);
+
+  // Enhanced getUserMedia
   const getUserMedia = useCallback(async () => {
     try {
       console.log('🎥 Requesting media access...');
-      setDebugInfo('Requesting camera...');
+      setDebugInfo('Requesting camera access...');
       
       const constraints = {
         video: {
@@ -256,9 +245,7 @@ const VideoChat = ({ user, updateUser }) => {
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      
       setLocalStream(stream);
-      setError(null);
       setDebugInfo('Camera access granted');
       
       if (localVideoRef.current) {
@@ -268,33 +255,25 @@ const VideoChat = ({ user, updateUser }) => {
         
         try {
           await localVideoRef.current.play();
+          console.log('✅ Local video started');
         } catch (playError) {
           console.warn('Local video autoplay failed:', playError);
         }
       }
       
-      console.log('✅ Media access successful');
       return stream;
-      
     } catch (error) {
       console.error('❌ Media access failed:', error);
-      
-      const errorMessage = error.name === 'NotAllowedError' 
-        ? 'Camera/microphone access denied. Please allow access and refresh.'
-        : error.name === 'NotFoundError'
-        ? 'No camera/microphone found. Please connect a device.'
-        : 'Failed to access camera/microphone. Please try again.';
-      
-      setError(errorMessage);
+      setConnectionStatus('Camera access failed');
       setDebugInfo(`Media error: ${error.name}`);
       throw error;
     }
   }, []);
 
-  // Initialize socket connection with enhanced debugging
+  // Initialize socket with auto partner finding
   const initializeSocket = useCallback(() => {
     console.log('🌐 Connecting to:', BACKEND_URL);
-    setDebugInfo(`Connecting to server...`);
+    setDebugInfo('Connecting to server...');
     
     if (socketRef.current) {
       socketRef.current.disconnect();
@@ -311,23 +290,31 @@ const VideoChat = ({ user, updateUser }) => {
 
     socketRef.current.on('connect', () => {
       console.log('✅ Connected to signaling server');
-      setConnectionStatus('Connected to server');
-      setError(null);
-      setDebugInfo(`Connected: ${socketRef.current.id}`);
+      setConnectionStatus('Connected! Starting search...');
+      setDebugInfo(`Connected: ${socketRef.current.id.slice(-6)}`);
+      
+      // **KEY FIX: Automatically start finding partner after connection**
+      setTimeout(() => {
+        if (localStream && user && user.id && user.gender) {
+          console.log('🔍 Auto-starting partner search...');
+          findPartner();
+        } else {
+          console.log('⚠️ Not ready for partner search yet');
+          setDebugInfo('Waiting for camera...');
+        }
+      }, 1000);
     });
 
     socketRef.current.on('disconnect', (reason) => {
       console.log('❌ Disconnected:', reason);
       setConnectionStatus('Disconnected from server');
-      setError('Lost connection to server');
       setDebugInfo(`Disconnected: ${reason}`);
     });
 
     socketRef.current.on('connect_error', (error) => {
       console.error('❌ Connection error:', error);
       setConnectionStatus('Connection failed');
-      setError('Failed to connect to server. Please check your internet.');
-      setDebugInfo(`Connection error: ${error.message}`);
+      setDebugInfo(`Error: ${error.message}`);
     });
 
     // Handle partner found
@@ -335,8 +322,7 @@ const VideoChat = ({ user, updateUser }) => {
       console.log('🎯 Partner matched:', partnerId);
       setConnectionStatus('Partner found! Connecting...');
       setIsConnecting(true);
-      setError(null);
-      setDebugInfo(`Matched with: ${partnerId}`);
+      setDebugInfo(`Matched: ${partnerId.slice(-6)}`);
       
       setTimeout(() => {
         initiateCall();
@@ -354,7 +340,7 @@ const VideoChat = ({ user, updateUser }) => {
     // Handle incoming call
     socketRef.current.on('offer', async (offer) => {
       console.log('📞 Received call offer');
-      setConnectionStatus('Incoming call... Connecting...');
+      setConnectionStatus('Incoming call...');
       setIsConnecting(true);
       setDebugInfo('Received offer');
       await handleOffer(offer);
@@ -385,27 +371,18 @@ const VideoChat = ({ user, updateUser }) => {
         remoteVideoRef.current.srcObject = null;
       }
 
-      // Auto find new partner after delay
       setTimeout(() => {
         findPartner();
       }, 2000);
     });
 
-    socketRef.current.on('error', (error) => {
-      console.error('Socket error:', error);
-      setError('Connection error occurred');
-      setDebugInfo(`Socket error: ${error}`);
-    });
-
-  }, []);
+  }, [localStream, user]);
 
   // Create peer connection
   const createPeerConnection = useCallback(() => {
     const config = {
       iceServers: ICE_SERVERS,
-      iceCandidatePoolSize: 10,
-      bundlePolicy: 'max-bundle',
-      rtcpMuxPolicy: 'require'
+      iceCandidatePoolSize: 10
     };
 
     const pc = new RTCPeerConnection(config);
@@ -423,7 +400,7 @@ const VideoChat = ({ user, updateUser }) => {
       setRemoteStream(stream);
       setConnectionStatus('Connected!');
       setIsConnecting(false);
-      setDebugInfo('Video call connected');
+      setDebugInfo('Video call active');
       
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
@@ -438,51 +415,29 @@ const VideoChat = ({ user, updateUser }) => {
     pc.onconnectionstatechange = () => {
       console.log('🔗 Connection state:', pc.connectionState);
       setDebugInfo(`WebRTC: ${pc.connectionState}`);
-      
-      switch (pc.connectionState) {
-        case 'connected':
-          setConnectionStatus('Connected!');
-          setIsConnecting(false);
-          break;
-        case 'disconnected':
-        case 'failed':
-          setConnectionStatus('Connection lost');
-          setIsConnecting(false);
-          setTimeout(() => findPartner(), 3000);
-          break;
-        case 'connecting':
-          setConnectionStatus('Connecting...');
-          setIsConnecting(true);
-          break;
-        default:
-          break;
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log('🧊 ICE connection state:', pc.iceConnectionState);
-      
-      if (pc.iceConnectionState === 'failed') {
-        console.log('ICE connection failed, attempting restart');
-        pc.restartIce();
-      }
     };
 
     return pc;
   }, []);
 
-  // Find a partner with enhanced user data
+  // Find partner function
   const findPartner = useCallback(() => {
-    if (!socketRef.current || !localStream) {
-      console.log('❌ Cannot find partner: socket or stream not ready');
+    if (!socketRef.current || !socketRef.current.connected) {
+      console.log('❌ Socket not connected, cannot find partner');
+      setDebugInfo('Socket not connected');
       return;
     }
 
-    console.log('🔍 Looking for partner with user data:', user);
+    if (!user || !user.id || !user.gender) {
+      console.log('❌ Invalid user data');
+      setDebugInfo('Invalid user data');
+      return;
+    }
+
+    console.log('🔍 Looking for partner...');
     setConnectionStatus('Looking for partner...');
     setIsConnecting(false);
-    setError(null);
-    setDebugInfo('Searching for partner...');
+    setDebugInfo('Searching...');
 
     // Clean up previous connection
     if (peerConnectionRef.current) {
@@ -495,12 +450,6 @@ const VideoChat = ({ user, updateUser }) => {
       remoteVideoRef.current.srcObject = null;
     }
 
-    // Validate user data
-    if (!user || !user.id || !user.gender) {
-      setError('Invalid user data. Please go back to home.');
-      return;
-    }
-
     const userData = {
       userId: user.id,
       gender: user.gender,
@@ -508,94 +457,67 @@ const VideoChat = ({ user, updateUser }) => {
       hasFilterCredit: (user.filterCredits > 0) || user.isPremium
     };
 
-    console.log('📤 Sending findPartner with data:', userData);
+    console.log('📤 Sending findPartner with:', userData);
     socketRef.current.emit('findPartner', userData);
-  }, [user, localStream]);
+  }, [user]);
 
-  // Initiate a call
+  // Initiate call
   const initiateCall = useCallback(async () => {
-    if (!localStream || !socketRef.current) {
-      console.log('❌ Cannot initiate call: missing requirements');
-      return;
-    }
+    if (!localStream || !socketRef.current) return;
 
     try {
       console.log('📞 Initiating call...');
       peerConnectionRef.current = createPeerConnection();
 
-      // Add local stream tracks
       localStream.getTracks().forEach(track => {
-        console.log('📤 Adding track to peer connection:', track.kind);
         peerConnectionRef.current.addTrack(track, localStream);
       });
 
-      // Create and send offer
-      const offer = await peerConnectionRef.current.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true
-      });
-
+      const offer = await peerConnectionRef.current.createOffer();
       await peerConnectionRef.current.setLocalDescription(offer);
       
       console.log('📞 Sending call offer');
       socketRef.current.emit('offer', offer);
-      setDebugInfo('Sent offer');
 
     } catch (error) {
       console.error('❌ Failed to initiate call:', error);
-      setConnectionStatus('Failed to initiate call');
-      setError('Failed to start call. Please try again.');
-      setDebugInfo(`Call error: ${error.message}`);
+      setConnectionStatus('Failed to start call');
+      setDebugInfo('Call failed');
     }
   }, [localStream, createPeerConnection]);
 
   // Handle incoming offer
   const handleOffer = useCallback(async (offer) => {
-    if (!localStream) {
-      console.log('❌ Cannot handle offer: no local stream');
-      return;
-    }
+    if (!localStream) return;
 
     try {
-      console.log('📞 Handling incoming offer...');
       peerConnectionRef.current = createPeerConnection();
 
-      // Add local stream tracks
       localStream.getTracks().forEach(track => {
         peerConnectionRef.current.addTrack(track, localStream);
       });
 
       await peerConnectionRef.current.setRemoteDescription(offer);
-
-      // Create and send answer
       const answer = await peerConnectionRef.current.createAnswer();
       await peerConnectionRef.current.setLocalDescription(answer);
 
       console.log('📞 Sending call answer');
       socketRef.current.emit('answer', answer);
-      setDebugInfo('Sent answer');
 
     } catch (error) {
       console.error('❌ Failed to handle offer:', error);
-      setConnectionStatus('Failed to connect');
-      setError('Failed to answer call. Please try again.');
     }
   }, [localStream, createPeerConnection]);
 
-  // Handle call answer
+  // Handle answer
   const handleAnswer = useCallback(async (answer) => {
-    if (!peerConnectionRef.current) {
-      console.log('❌ No peer connection for answer');
-      return;
-    }
+    if (!peerConnectionRef.current) return;
 
     try {
       await peerConnectionRef.current.setRemoteDescription(answer);
       console.log('✅ Call answer processed');
-      setDebugInfo('Answer processed');
     } catch (error) {
       console.error('❌ Failed to handle answer:', error);
-      setError('Failed to process call answer.');
     }
   }, []);
 
@@ -605,13 +527,12 @@ const VideoChat = ({ user, updateUser }) => {
 
     try {
       await peerConnectionRef.current.addIceCandidate(candidate);
-      console.log('📡 ICE candidate added');
     } catch (error) {
       console.error('❌ Failed to add ICE candidate:', error);
     }
   }, []);
 
-  // Toggle audio
+  // Control functions
   const toggleAudio = useCallback(() => {
     if (localStream) {
       const audioTrack = localStream.getAudioTracks()[0];
@@ -622,7 +543,6 @@ const VideoChat = ({ user, updateUser }) => {
     }
   }, [localStream, audioEnabled]);
 
-  // Toggle video
   const toggleVideo = useCallback(() => {
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
@@ -633,7 +553,6 @@ const VideoChat = ({ user, updateUser }) => {
     }
   }, [localStream, videoEnabled]);
 
-  // End call and find next partner
   const nextPartner = useCallback(() => {
     console.log('🔄 Finding next partner...');
     
@@ -656,21 +575,17 @@ const VideoChat = ({ user, updateUser }) => {
     }, 1000);
   }, [findPartner]);
 
-  // Stop call and go home
   const stopCall = useCallback(() => {
     console.log('🛑 Stopping call');
     
-    // Stop local stream
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
     }
 
-    // Close peer connection
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
     }
 
-    // Disconnect socket
     if (socketRef.current) {
       socketRef.current.emit('endCall');
       socketRef.current.disconnect();
@@ -681,28 +596,19 @@ const VideoChat = ({ user, updateUser }) => {
 
   // Initialize everything
   useEffect(() => {
-    // Check if user data is valid
-    if (!user || !user.id || !user.gender) {
-      console.log('❌ Invalid user data, redirecting to home');
-      navigate('/');
-      return;
-    }
-
     const init = async () => {
       try {
         await getUserMedia();
         initializeSocket();
       } catch (error) {
         console.error('❌ Initialization failed:', error);
-        setConnectionStatus('Initialization failed');
       }
     };
 
     init();
 
-    // Cleanup on unmount
     return () => {
-      console.log('🧹 Cleaning up VideoChat component');
+      console.log('🧹 Cleaning up...');
       
       if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
@@ -716,33 +622,39 @@ const VideoChat = ({ user, updateUser }) => {
         socketRef.current.disconnect();
       }
     };
-  }, [user, navigate, getUserMedia, initializeSocket]);
+  }, [getUserMedia, initializeSocket]);
 
-  // Auto-find partner when ready
+  // **KEY FIX: Auto-start partner search when everything is ready**
   useEffect(() => {
-    if (localStream && socketRef.current && socketRef.current.connected) {
-      console.log('✅ Ready to find partner');
+    if (localStream && 
+        socketRef.current && 
+        socketRef.current.connected && 
+        user && 
+        user.id && 
+        user.gender &&
+        connectionStatus === 'Connected! Starting search...') {
+      
+      console.log('✅ All ready - starting partner search');
       setTimeout(() => {
         findPartner();
-      }, 1000);
+      }, 2000);
     }
-  }, [localStream, findPartner]);
+  }, [localStream, user, connectionStatus, findPartner]);
 
   return (
     <Container>
-      {error && <ErrorMessage>{error}</ErrorMessage>}
-      
       <ConnectionStatus status={
         connectionStatus === 'Connected!' ? 'connected' :
-        isConnecting || connectionStatus.includes('connecting') ? 'connecting' :
+        isConnecting || connectionStatus.includes('connecting') || connectionStatus.includes('Connecting') ? 'connecting' :
         'disconnected'
       }>
         {connectionStatus}
       </ConnectionStatus>
 
       <DebugInfo>
-        URL: {BACKEND_URL.split('//')[1]}<br/>
-        User: {user?.id?.slice(-6)}<br/>
+        Backend: ...{BACKEND_URL.split('.')[0].slice(-10)}<br/>
+        User: {user?.id?.slice(-8)}<br/>
+        Gender: {user?.gender}<br/>
         Status: {debugInfo}
       </DebugInfo>
 
@@ -784,7 +696,6 @@ const VideoChat = ({ user, updateUser }) => {
           active={audioEnabled}
           onClick={toggleAudio}
           disabled={!localStream}
-          title={audioEnabled ? 'Mute Audio' : 'Unmute Audio'}
         >
           {audioEnabled ? '🎤' : '🔇'}
         </ControlButton>
@@ -794,7 +705,6 @@ const VideoChat = ({ user, updateUser }) => {
           active={videoEnabled}
           onClick={toggleVideo}
           disabled={!localStream}
-          title={videoEnabled ? 'Turn Off Video' : 'Turn On Video'}
         >
           {videoEnabled ? '📹' : '📷'}
         </ControlButton>
@@ -803,7 +713,6 @@ const VideoChat = ({ user, updateUser }) => {
           className="secondary"
           onClick={nextPartner}
           disabled={isConnecting}
-          title="Find Next Partner"
         >
           ⏭️
         </ControlButton>
@@ -811,7 +720,6 @@ const VideoChat = ({ user, updateUser }) => {
         <ControlButton
           className="primary"
           onClick={stopCall}
-          title="End Call"
         >
           ❌
         </ControlButton>
@@ -819,7 +727,6 @@ const VideoChat = ({ user, updateUser }) => {
         <ControlButton
           className="home"
           onClick={stopCall}
-          title="Go Home"
         >
           🏠
         </ControlButton>
