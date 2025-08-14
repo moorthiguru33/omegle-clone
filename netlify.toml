@@ -3,7 +3,8 @@
   publish = "build"
 
 [build.environment]
-  REACT_APP_BACKEND_URL = "https://your-railway-app.up.railway.app"
+  REACT_APP_BACKEND_URL = "https://omegle-clone-backend-production-8f06.up.railway.app"
+  NODE_VERSION = "18"
   CI = "false"
 
 [[redirects]]
@@ -15,5 +16,23 @@
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
-    Permissions-Policy = "camera=(self), microphone=(self)"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(self), microphone=(self), autoplay=(self)"
+    Content-Security-Policy = "default-src 'self'; connect-src 'self' wss: https:; media-src 'self' blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
