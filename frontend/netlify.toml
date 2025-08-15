@@ -10,13 +10,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
-[dev]
-  command = "npm start"
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Permissions-Policy = "camera=(self), microphone=(self)"
