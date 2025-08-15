@@ -3,6 +3,69 @@ import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import styled from 'styled-components';
 
+// Browser detection utilities
+const getBrowserInfo = () => {
+  const ua = navigator.userAgent;
+  return {
+    isChrome: /Chrome/.test(ua) && /Google Inc/.test(navigator.vendor),
+    isSafari: /Safari/.test(ua) && /Apple Computer/.test(navigator.vendor),
+    isFirefox: /Firefox/.test(ua),
+    isEdge: /Edg/.test(ua),
+    isMobile: /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua),
+    isIOS: /iPad|iPhone|iPod/.test(ua),
+    isAndroid: /Android/.test(ua),
+    browserType: (() => {
+      if (/iPad|iPhone|iPod/.test(ua)) return 'iOS Safari';
+      if (/Safari/.test(ua) && /Apple Computer/.test(navigator.vendor)) return 'Safari';
+      if (/Chrome/.test(ua) && /Google Inc/.test(navigator.vendor)) return 'Chrome';
+      if (/Firefox/.test(ua)) return 'Firefox';
+      if (/Edg/.test(ua)) return 'Edge';
+      if (/Android/.test(ua)) return 'Android';
+      return 'Unknown';
+    })()
+  };
+};
+
+// Enhanced ICE servers with better reliability for all browsers
+const ICE_SERVERS = [
+  // Multiple Google STUN servers
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
+  
+  // Additional reliable STUN servers
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  { urls: 'stun:stun.nextcloud.com:443' },
+  { urls: 'stun:stun.sipgate.net:3478' },
+  
+  // Multiple TURN servers for better connectivity
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  
+  // Alternative TURN server
+  {
+    urls: 'turn:relay1.expressturn.com:3478',
+    username: 'ef4IKQP7KOQC8QJZFR',
+    credential: 'tWIcqVHfT8eDis7P'
+  }
+];
+
+// Styled components (same as before, keeping existing styling)
 const Container = styled.div`
   display: flex;
   flex-direction: column;
@@ -85,13 +148,13 @@ const ConnectionStatus = styled.div`
   font-weight: 600;
   backdrop-filter: blur(10px);
   z-index: 1000;
-  max-width: 200px;
+  max-width: 250px;
   text-align: center;
 
   @media (max-width: 480px) {
     font-size: 12px;
     padding: 6px 12px;
-    max-width: 150px;
+    max-width: 180px;
   }
 `;
 
@@ -300,30 +363,6 @@ const ReportContent = styled.div`
   }
 `;
 
-const StatsOverlay = styled.div`
-  position: absolute;
-  top: 70px;
-  right: 20px;
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-family: monospace;
-  z-index: 100;
-  min-width: 200px;
-
-  .stat-row {
-    display: flex;
-    justify-content: space-between;
-    margin: 4px 0;
-  }
-
-  @media (max-width: 480px) {
-    display: none;
-  }
-`;
-
 const DebugPanel = styled.div`
   position: fixed;
   top: 10px;
@@ -343,37 +382,6 @@ const DebugPanel = styled.div`
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://omegle-clone-backend-production-8f06.up.railway.app';
 
-// Enhanced ICE servers with multiple STUN/TURN servers
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun.cloudflare.com:3478' },
-  { urls: 'stun:stun.nextcloud.com:443' },
-  { urls: 'stun:stun.sipgate.net:3478' },
-  { urls: 'stun:stun.12voip.com:3478' },
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:relay1.expressturn.com:3478',
-    username: 'ef4IKQP7KOQC8QJZFR',
-    credential: 'tWIcqVHfT8eDis7P'
-  }
-];
-
 const VideoChat = ({ user, updateUser }) => {
   const navigate = useNavigate();
   const localVideoRef = useRef();
@@ -382,6 +390,7 @@ const VideoChat = ({ user, updateUser }) => {
   const peerConnectionRef = useRef();
   const connectionTimeoutRef = useRef();
   const reconnectTimeoutRef = useRef();
+  const browserInfo = getBrowserInfo();
 
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
@@ -393,13 +402,8 @@ const VideoChat = ({ user, updateUser }) => {
   const [retryCount, setRetryCount] = useState(0);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
-  const [connectionStats, setConnectionStats] = useState({
-    bytesReceived: 0,
-    bytesSent: 0,
-    packetsLost: 0,
-    quality: 'good'
-  });
-  const [showStats, setShowStats] = useState(false);
+  const [connectionStrategy, setConnectionStrategy] = useState(null);
+  const [isPoliteMode, setIsPoliteMode] = useState(false);
   const [debugInfo, setDebugInfo] = useState({
     localStreamTracks: 0,
     remoteStreamTracks: 0,
@@ -407,114 +411,132 @@ const VideoChat = ({ user, updateUser }) => {
     connectionState: 'new',
     signalingState: 'stable',
     iceGatheringState: 'new',
-    lastError: null
+    lastError: null,
+    browserType: browserInfo.browserType
   });
 
-  // Enhanced getUserMedia with fallback options
+  // Enhanced getUserMedia with browser-specific constraints
   const getUserMedia = useCallback(async () => {
-    const constraints = {
-      video: {
-        width: { min: 320, ideal: 640, max: 1280 },
-        height: { min: 240, ideal: 480, max: 720 },
-        frameRate: { min: 10, ideal: 24, max: 30 },
-        facingMode: 'user'
-      },
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        sampleRate: { ideal: 44100 }
-      }
-    };
+    let constraints;
+    
+    // Browser-specific media constraints
+    if (browserInfo.isIOS) {
+      // iOS Safari specific constraints
+      constraints = {
+        video: {
+          width: { ideal: 480, max: 640 },
+          height: { ideal: 320, max: 480 },
+          frameRate: { ideal: 15, max: 24 },
+          facingMode: 'user'
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false // iOS handles this
+        }
+      };
+    } else if (browserInfo.isSafari) {
+      // Desktop Safari constraints
+      constraints = {
+        video: {
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 480, max: 720 },
+          frameRate: { ideal: 24, max: 30 }
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      };
+    } else if (browserInfo.isMobile) {
+      // Other mobile browsers
+      constraints = {
+        video: {
+          width: { ideal: 640, max: 854 },
+          height: { ideal: 480, max: 480 },
+          frameRate: { ideal: 20, max: 30 },
+          facingMode: 'user'
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      };
+    } else {
+      // Desktop browsers
+      constraints = {
+        video: {
+          width: { min: 320, ideal: 640, max: 1280 },
+          height: { min: 240, ideal: 480, max: 720 },
+          frameRate: { min: 15, ideal: 24, max: 30 }
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: { ideal: 44100 }
+        }
+      };
+    }
 
-    try {
-      console.log('[MEDIA] Requesting media access with constraints:', constraints);
-      setConnectionStatus('Requesting camera/microphone access...');
+    const fallbackConstraints = [
+      constraints,
+      { video: { width: 480, height: 320 }, audio: true },
+      { video: { width: 320, height: 240 }, audio: true },
+      { video: true, audio: true },
+      { audio: true } // Audio only fallback
+    ];
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      console.log('[SUCCESS] Media access granted, tracks:', stream.getTracks().map(t => `${t.kind}: ${t.enabled}`));
-
-      setLocalStream(stream);
-      setError(null);
-
-      setDebugInfo(prev => ({
-        ...prev,
-        localStreamTracks: stream.getTracks().length
-      }));
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        localVideoRef.current.onloadedmetadata = () => {
-          localVideoRef.current.play().catch(e => {
-            console.error('[ERROR] Local video play failed:', e);
-          });
-        };
-      }
-
-      console.log('[SUCCESS] Local video stream set');
-      return stream;
-    } catch (error) {
-      console.error('[ERROR] Media access failed:', error);
-      setDebugInfo(prev => ({
-        ...prev,
-        lastError: `Media access failed: ${error.message}`
-      }));
-
-      // Try with progressively simpler constraints
-      const fallbackConstraints = [
-        { video: { width: 640, height: 480 }, audio: true },
-        { video: { width: 320, height: 240 }, audio: true },
-        { video: true, audio: true },
-        { video: false, audio: true }
-      ];
-
-      for (let i = 0; i < fallbackConstraints.length; i++) {
-        try {
-          console.log(`[FALLBACK] Trying fallback ${i + 1}:`, fallbackConstraints[i]);
-          const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints[i]);
-          console.log('[SUCCESS] Fallback media access granted');
-
-          setLocalStream(stream);
-          setError(null);
-
-          setDebugInfo(prev => ({
-            ...prev,
-            localStreamTracks: stream.getTracks().length,
-            lastError: `Fallback ${i + 1} successful`
-          }));
-
-          if (localVideoRef.current) {
-            localVideoRef.current.srcObject = stream;
-            localVideoRef.current.onloadedmetadata = () => {
-              localVideoRef.current.play().catch(console.error);
-            };
+    for (let i = 0; i < fallbackConstraints.length; i++) {
+      try {
+        console.log(`[MEDIA] Attempting constraints ${i + 1}:`, fallbackConstraints[i]);
+        setConnectionStatus(`Requesting camera access (${browserInfo.browserType})...`);
+        
+        const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints[i]);
+        
+        setLocalStream(stream);
+        setDebugInfo(prev => ({
+          ...prev,
+          localStreamTracks: stream.getTracks().length,
+          lastError: null
+        }));
+        
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+          
+          // Browser-specific video handling
+          if (browserInfo.isIOS || browserInfo.isSafari) {
+            localVideoRef.current.playsInline = true;
+            localVideoRef.current.autoplay = true;
+            localVideoRef.current.muted = true;
           }
-
-          return stream;
-        } catch (fallbackError) {
-          console.log(`[FALLBACK] Fallback ${i + 1} failed:`, fallbackError.message);
+          
+          localVideoRef.current.onloadedmetadata = () => {
+            localVideoRef.current.play().catch(console.error);
+          };
+        }
+        
+        console.log(`[SUCCESS] Media access granted with constraint set ${i + 1} (${browserInfo.browserType})`);
+        return stream;
+      } catch (error) {
+        console.log(`[FALLBACK] Constraint set ${i + 1} failed:`, error.message);
+        setDebugInfo(prev => ({
+          ...prev,
+          lastError: `Media constraint ${i + 1} failed: ${error.message}`
+        }));
+        
+        if (i === fallbackConstraints.length - 1) {
+          throw error;
         }
       }
-
-      // All fallbacks failed
-      let errorMessage = 'Camera/microphone access failed. ';
-      if (error.name === 'NotAllowedError') {
-        errorMessage = 'Camera/microphone access denied. Please allow access and refresh the page.';
-      } else if (error.name === 'NotFoundError') {
-        errorMessage = 'No camera/microphone found. Please connect a device and try again.';
-      } else if (error.name === 'NotReadableError') {
-        errorMessage = 'Camera/microphone is already in use by another application.';
-      }
-
-      setError(errorMessage);
-      setConnectionStatus('Media access failed');
-      throw error;
     }
-  }, []);
+  }, [browserInfo]);
 
-  // Create peer connection with enhanced configuration
+  // Create peer connection with browser-specific configuration
   const createPeerConnection = useCallback(() => {
-    const config = {
+    let config = {
       iceServers: ICE_SERVERS,
       iceCandidatePoolSize: 10,
       bundlePolicy: 'max-bundle',
@@ -523,223 +545,206 @@ const VideoChat = ({ user, updateUser }) => {
       sdpSemantics: 'unified-plan'
     };
 
+    // Browser-specific configuration adjustments
+    if (browserInfo.isIOS) {
+      // iOS Safari needs special handling
+      config.iceTransportPolicy = 'relay'; // Force TURN for better iOS compatibility
+      config.iceCandidatePoolSize = 5;
+    } else if (browserInfo.isSafari) {
+      config.bundlePolicy = 'balanced'; // Safari prefers balanced
+    } else if (browserInfo.isFirefox) {
+      config.iceCandidatePoolSize = 5; // Firefox optimization
+    }
+
     const pc = new RTCPeerConnection(config);
-
-    const candidateBuffer = [];
-    let remoteDescriptionSet = false;
-
+    
+    // Enhanced ICE candidate handling
     pc.onicecandidate = (event) => {
       if (event.candidate && socketRef.current?.connected) {
-        console.log('[WEBRTC] Sending ICE candidate:', event.candidate.candidate);
+        console.log(`[ICE] Sending candidate (${browserInfo.browserType}):`, event.candidate.candidate.substring(0, 50) + '...');
         socketRef.current.emit('ice-candidate', event.candidate);
       } else if (!event.candidate) {
-        console.log('[WEBRTC] ICE gathering complete');
+        console.log('[ICE] Gathering complete');
       }
     };
 
     pc.ontrack = (event) => {
-      console.log('[WEBRTC] Received remote stream, tracks:', event.streams[0].getTracks().length);
+      console.log(`[WEBRTC] Remote stream received (${browserInfo.browserType})`);
       const [stream] = event.streams;
-
+      
       if (stream.getTracks().length === 0) {
         console.error('[ERROR] Remote stream has no tracks');
         return;
       }
-
+      
       setRemoteStream(stream);
       setDebugInfo(prev => ({
         ...prev,
         remoteStreamTracks: stream.getTracks().length
       }));
-
+      
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
+        
+        // Browser-specific remote video handling
+        if (browserInfo.isIOS || browserInfo.isSafari) {
+          remoteVideoRef.current.playsInline = true;
+          remoteVideoRef.current.autoplay = true;
+          
+          // iOS needs user interaction for autoplay
+          if (browserInfo.isIOS) {
+            remoteVideoRef.current.muted = false;
+            setTimeout(() => {
+              remoteVideoRef.current.play().catch(e => {
+                console.log('[iOS] Autoplay prevented, user interaction needed');
+                setConnectionStatus('Tap video to start');
+              });
+            }, 100);
+          }
+        }
+        
         remoteVideoRef.current.onloadedmetadata = () => {
-          remoteVideoRef.current.play().catch(e => {
-            console.error('[ERROR] Remote video play failed:', e);
-          });
+          remoteVideoRef.current.play().catch(console.error);
         };
       }
-
+      
       setConnectionStatus('Connected');
       setIsConnecting(false);
       clearTimeout(connectionTimeoutRef.current);
-
-      monitorConnectionQuality(pc);
     };
 
+    // Enhanced connection state handling with browser-specific timeouts
     pc.onconnectionstatechange = () => {
-      console.log('[WEBRTC] Connection state:', pc.connectionState);
+      console.log(`[WEBRTC] Connection state: ${pc.connectionState} (${browserInfo.browserType})`);
       setDebugInfo(prev => ({
         ...prev,
         connectionState: pc.connectionState
       }));
-
+      
       switch (pc.connectionState) {
         case 'connected':
-          console.log('[SUCCESS] WebRTC connection established!');
           setConnectionStatus('Connected');
           setIsConnecting(false);
           setRetryCount(0);
           clearTimeout(connectionTimeoutRef.current);
           break;
         case 'connecting':
-          console.log('[WEBRTC] WebRTC connecting...');
           setConnectionStatus('Establishing connection...');
           setIsConnecting(true);
           
+          // Browser-specific timeout handling
+          const timeout = connectionStrategy?.iceTimeout || 
+                         (browserInfo.isIOS ? 25000 : 
+                          browserInfo.isSafari ? 20000 : 
+                          browserInfo.isMobile ? 15000 : 12000);
+          
           connectionTimeoutRef.current = setTimeout(() => {
             if (pc.connectionState === 'connecting') {
-              console.log('[TIMEOUT] WebRTC connection timeout, retrying...');
-              pc.close();
-              setTimeout(() => {
-                if (retryCount < 5) {
-                  setRetryCount(prev => prev + 1);
-                  findPartner();
-                } else {
-                  setConnectionStatus('Connection failed. Please refresh and try again.');
-                }
-              }, 2000);
+              console.log(`[TIMEOUT] Connection timeout (${browserInfo.browserType}), retrying...`);
+              nextPartner();
             }
-          }, 15000);
+          }, timeout);
           break;
         case 'disconnected':
-          console.log('[WEBRTC] Connection disconnected');
-          setConnectionStatus('Partner disconnected');
+          setConnectionStatus('Connection lost');
           setIsConnecting(false);
           setTimeout(() => findPartner(), 3000);
           break;
         case 'failed':
-          console.log('[ERROR] WebRTC connection failed, attempting recovery...');
+          console.log(`[ERROR] Connection failed (${browserInfo.browserType})`);
           setConnectionStatus('Connection failed - retrying...');
           setIsConnecting(false);
-          pc.close();
-
-          if (retryCount < 5) {
+          if (retryCount < 3) {
             setTimeout(() => {
               setRetryCount(prev => prev + 1);
-              console.log(`[RETRY] Retry attempt ${retryCount + 1}/5`);
               findPartner();
             }, 2000);
           } else {
-            setConnectionStatus('Connection failed after multiple attempts. Please refresh.');
+            setConnectionStatus('Connection failed. Please refresh.');
             setError('Unable to establish connection. Please refresh the page.');
           }
-          break;
-        case 'closed':
-          console.log('[WEBRTC] Connection closed');
-          break;
-        default:
-          console.log('[WEBRTC] Unknown connection state:', pc.connectionState);
           break;
       }
     };
 
     pc.oniceconnectionstatechange = () => {
-      console.log('[WEBRTC] ICE connection state:', pc.iceConnectionState);
+      console.log(`[ICE] Connection state: ${pc.iceConnectionState} (${browserInfo.browserType})`);
       setDebugInfo(prev => ({
         ...prev,
         iceConnectionState: pc.iceConnectionState
       }));
-
-      switch (pc.iceConnectionState) {
-        case 'connected':
-        case 'completed':
-          console.log('[SUCCESS] ICE connection established!');
-          setRetryCount(0);
-          break;
-        case 'disconnected':
-          console.log('[WARNING] ICE connection disconnected');
-          setConnectionStatus('Connection unstable...');
-          break;
-        case 'failed':
-          console.log('[ERROR] ICE connection failed');
-          if (retryCount < 3) {
-            setTimeout(() => {
-              setRetryCount(prev => prev + 1);
-              nextPartner();
-            }, 2000);
-          }
-          break;
-        case 'checking':
-          console.log('[INFO] ICE connectivity checks in progress...');
-          setConnectionStatus('Checking connectivity...');
-          break;
+      
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        setRetryCount(0);
+      } else if (pc.iceConnectionState === 'failed') {
+        console.log('[ICE] Connection failed, trying next partner');
+        if (retryCount < 3) {
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+            nextPartner();
+          }, 2000);
+        }
       }
     };
 
+    pc.onsignalingstatechange = () => {
+      console.log(`[SIGNALING] State: ${pc.signalingState} (${browserInfo.browserType})`);
+      setDebugInfo(prev => ({
+        ...prev,
+        signalingState: pc.signalingState
+      }));
+    };
+
     pc.onicegatheringstatechange = () => {
-      console.log('[WEBRTC] ICE gathering state:', pc.iceGatheringState);
+      console.log(`[ICE] Gathering state: ${pc.iceGatheringState} (${browserInfo.browserType})`);
       setDebugInfo(prev => ({
         ...prev,
         iceGatheringState: pc.iceGatheringState
       }));
     };
 
-    pc.onsignalingstatechange = () => {
-      console.log('[WEBRTC] Signaling state:', pc.signalingState);
-      setDebugInfo(prev => ({
-        ...prev,
-        signalingState: pc.signalingState
-      }));
-      
-      if (pc.signalingState === 'stable') {
-        remoteDescriptionSet = true;
-        candidateBuffer.forEach(candidate => {
-          pc.addIceCandidate(candidate).catch(console.error);
-        });
-        candidateBuffer.length = 0;
-      }
+    return pc;
+  }, [connectionStrategy, browserInfo, retryCount]);
+
+  // Browser-specific offer/answer handling
+  const createOffer = useCallback(async (pc) => {
+    let constraints = {
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true
     };
 
-    return pc;
-  }, [retryCount]);
-
-  // Monitor connection quality
-  const monitorConnectionQuality = useCallback((pc) => {
-    if (!pc) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const stats = await pc.getStats();
-        let bytesReceived = 0;
-        let bytesSent = 0;
-        let packetsLost = 0;
-
-        stats.forEach(report => {
-          if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
-            bytesReceived = report.bytesReceived || 0;
-            packetsLost = report.packetsLost || 0;
-          }
-          if (report.type === 'outbound-rtp' && report.mediaType === 'video') {
-            bytesSent = report.bytesSent || 0;
-          }
-        });
-
-        const quality = packetsLost > 100 ? 'poor' : packetsLost > 30 ? 'good' : 'excellent';
-
-        setConnectionStats({
-          bytesReceived,
-          bytesSent,
-          packetsLost,
-          quality
-        });
-      } catch (error) {
-        console.log('[STATS] Error getting connection stats:', error);
-      }
-    }, 5000);
-
-    setTimeout(() => clearInterval(interval), 60000);
-  }, []);
-
-  // Initialize socket connection with retry logic
-  const initializeSocket = useCallback(() => {
-    if (socketRef.current?.connected) {
-      return;
+    // Safari-specific constraints
+    if (browserInfo.isSafari) {
+      constraints.voiceActivityDetection = false;
     }
 
-    console.log('[SOCKET] Connecting to signaling server...');
-    setConnectionStatus('Connecting to server...');
+    // iOS-specific constraints
+    if (browserInfo.isIOS) {
+      constraints.iceRestart = false;
+    }
+
+    return await pc.createOffer(constraints);
+  }, [browserInfo]);
+
+  const createAnswer = useCallback(async (pc) => {
+    let constraints = {
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: true
+    };
+
+    if (browserInfo.isSafari) {
+      constraints.voiceActivityDetection = false;
+    }
+
+    return await pc.createAnswer(constraints);
+  }, [browserInfo]);
+
+  // Initialize socket connection with enhanced browser detection
+  const initializeSocket = useCallback(() => {
+    if (socketRef.current?.connected) return;
+
+    console.log(`[SOCKET] Initializing connection (${browserInfo.browserType})...`);
+    setConnectionStatus(`Connecting to server (${browserInfo.browserType})...`);
 
     socketRef.current = io(BACKEND_URL, {
       transports: ['websocket', 'polling'],
@@ -747,30 +752,70 @@ const VideoChat = ({ user, updateUser }) => {
       forceNew: true,
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000
+      reconnectionDelay: 1000
     });
 
     socketRef.current.on('connect', () => {
-      console.log('[SUCCESS] Connected to signaling server');
+      console.log(`[SUCCESS] Connected to server (${browserInfo.browserType})`);
       setConnectionStatus('Connected to server');
       setError(null);
       setRetryCount(0);
     });
 
+    socketRef.current.on('matched', (matchData) => {
+      console.log(`[MATCH] Partner matched (${browserInfo.browserType}):`, matchData);
+      setConnectionStatus('Partner found! Preparing connection...');
+      setIsConnecting(true);
+      
+      // Store connection strategy
+      if (matchData.connectionStrategy) {
+        setConnectionStrategy(matchData.connectionStrategy);
+        console.log(`[STRATEGY] Connection strategy: ${matchData.connectionStrategy.type}`);
+      }
+      
+      // Determine if we should be polite or impolite
+      setIsPoliteMode(matchData.isPolite || false);
+      
+      // Browser-specific delay before starting WebRTC
+      const delay = browserInfo.isIOS ? 3000 : 
+                   browserInfo.isSafari ? 2500 : 
+                   browserInfo.isMobile ? 2000 : 1500;
+      
+      setTimeout(() => {
+        initiateCall();
+      }, delay);
+    });
+
+    socketRef.current.on('offer', handleOffer);
+    socketRef.current.on('answer', handleAnswer);
+    socketRef.current.on('ice-candidate', handleIceCandidate);
+
+    socketRef.current.on('partnerDisconnected', () => {
+      console.log(`[PARTNER] Partner disconnected (${browserInfo.browserType})`);
+      setConnectionStatus('Partner left');
+      setRemoteStream(null);
+      setIsConnecting(false);
+      clearTimeout(connectionTimeoutRef.current);
+      
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = null;
+      }
+      setTimeout(() => findPartner(), 2000);
+    });
+
     socketRef.current.on('disconnect', (reason) => {
-      console.log('[DISCONNECT] Disconnected from signaling server:', reason);
+      console.log(`[DISCONNECT] Disconnected from server: ${reason} (${browserInfo.browserType})`);
       setConnectionStatus('Disconnected from server');
       if (reason === 'io server disconnect') {
         reconnectTimeoutRef.current = setTimeout(() => {
-          console.log('[RECONNECT] Attempting to reconnect...');
+          console.log(`[RECONNECT] Attempting to reconnect (${browserInfo.browserType})...`);
           initializeSocket();
         }, 3000);
       }
     });
 
     socketRef.current.on('connect_error', (error) => {
-      console.error('[ERROR] Connection error:', error);
+      console.error(`[ERROR] Connection error (${browserInfo.browserType}):`, error);
       setConnectionStatus('Server connection failed');
       setError('Failed to connect to server. Retrying...');
       
@@ -784,246 +829,136 @@ const VideoChat = ({ user, updateUser }) => {
       }, 3000);
     });
 
-    // Enhanced matched handler
-    socketRef.current.on('matched', (matchData) => {
-      console.log('[MATCH] Partner matched:', matchData);
-      setConnectionStatus('Partner found! Preparing connection...');
-      setIsConnecting(true);
-
-      setTimeout(() => {
-        console.log('[WEBRTC] Initiating WebRTC connection...');
-        initiateCall();
-      }, 1500);
+    // Handle other socket events (error, timeout, report, ban)
+    socketRef.current.on('error', (error) => {
+      console.error(`[ERROR] Socket error (${browserInfo.browserType}):`, error);
+      setError(error.message || 'Connection error occurred');
     });
 
-    // Handle waiting for partner
-    socketRef.current.on('waiting', () => {
-      setConnectionStatus('Looking for partner...');
-      setIsConnecting(false);
-    });
-
-    // Enhanced offer handler
-    socketRef.current.on('offer', async (offer) => {
-      console.log('[WEBRTC] Received offer:', offer);
-      console.log('[WEBRTC] Offer SDP preview:', offer.sdp?.substring(0, 100) + '...');
-
-      setConnectionStatus('Incoming call... Setting up connection...');
-      setIsConnecting(true);
-
-      try {
-        await handleOffer(offer);
-      } catch (error) {
-        console.error('[ERROR] Failed to handle offer:', error);
-        setDebugInfo(prev => ({
-          ...prev,
-          lastError: `Offer handling failed: ${error.message}`
-        }));
-      }
-    });
-
-    // Enhanced answer handler
-    socketRef.current.on('answer', async (answer) => {
-      console.log('[WEBRTC] Received answer:', answer);
-      console.log('[WEBRTC] Answer SDP preview:', answer.sdp?.substring(0, 100) + '...');
-
-      try {
-        await handleAnswer(answer);
-      } catch (error) {
-        console.error('[ERROR] Failed to handle answer:', error);
-        setDebugInfo(prev => ({
-          ...prev,
-          lastError: `Answer handling failed: ${error.message}`
-        }));
-      }
-    });
-
-    // Enhanced ICE candidate handler
-    socketRef.current.on('ice-candidate', async (candidate) => {
-      console.log('[WEBRTC] Received ICE candidate:', candidate?.candidate?.substring(0, 50) + '...');
-
-      try {
-        await handleIceCandidate(candidate);
-      } catch (error) {
-        console.error('[ERROR] Failed to handle ICE candidate:', error);
-      }
-    });
-
-    // Handle partner disconnect
-    socketRef.current.on('partnerDisconnected', () => {
-      console.log('[PARTNER] Partner disconnected');
-      setConnectionStatus('Partner disconnected');
-      setRemoteStream(null);
-      setIsConnecting(false);
-      clearTimeout(connectionTimeoutRef.current);
-      
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = null;
-      }
-
-      setTimeout(() => {
-        findPartner();
-      }, 2000);
-    });
-
-    // Handle user being reported
     socketRef.current.on('reported', (data) => {
-      console.log('[REPORTED] You have been reported:', data);
+      console.log(`[REPORTED] You have been reported (${browserInfo.browserType}):`, data);
       setError(`You have been reported for: ${data.reason}. Connection will be terminated.`);
-      setTimeout(() => {
-        navigate('/');
-      }, 5000);
+      setTimeout(() => navigate('/'), 5000);
     });
 
-    // Handle user being banned
     socketRef.current.on('banned', (data) => {
-      console.log('[BANNED] User banned:', data);
+      console.log(`[BANNED] User banned (${browserInfo.browserType}):`, data);
       setError('You have been banned from the service due to multiple reports.');
-      setTimeout(() => {
-        navigate('/');
-      }, 3000);
+      setTimeout(() => navigate('/'), 3000);
     });
 
-    // Handle report received confirmation
-    socketRef.current.on('reportReceived', (data) => {
-      console.log('[REPORT] Report received:', data);
+    socketRef.current.on('reportReceived', () => {
       setShowReportModal(false);
       setConnectionStatus('Report submitted. Finding new partner...');
       setTimeout(() => findPartner(), 2000);
     });
 
-    // Handle errors
-    socketRef.current.on('error', (error) => {
-      console.error('[ERROR] Socket error:', error);
-      setError(error.message || 'Connection error occurred');
-    });
+  }, [browserInfo, retryCount]);
 
-    // Handle timeout
-    socketRef.current.on('timeout', (data) => {
-      console.log('[TIMEOUT] Connection timeout:', data);
-      setError('Connection timeout. Please refresh and try again.');
-    });
-  }, [retryCount]);
-
-  // Initiate a call (create offer)
+  // Initiate call with polite/impolite pattern for better browser compatibility
   const initiateCall = useCallback(async () => {
     if (!localStream || !socketRef.current?.connected) {
-      console.log('[ERROR] Cannot initiate call: missing stream or socket');
+      console.log(`[ERROR] Cannot initiate call: missing requirements (${browserInfo.browserType})`);
       return;
     }
 
     try {
-      console.log('[WEBRTC] Initiating call...');
+      console.log(`[WEBRTC] Initiating call (${browserInfo.browserType})...`);
       peerConnectionRef.current = createPeerConnection();
 
-      // Add local stream tracks
+      // Add tracks to peer connection
       localStream.getTracks().forEach(track => {
-        console.log('[WEBRTC] Adding local track:', track.kind, track.enabled);
         peerConnectionRef.current.addTrack(track, localStream);
+        console.log(`[WEBRTC] Added ${track.kind} track (${browserInfo.browserType})`);
       });
 
-      // Create offer with specific constraints
-      const offer = await peerConnectionRef.current.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true,
-        iceRestart: false
-      });
-
+      // Create offer with browser-specific handling
+      const offer = await createOffer(peerConnectionRef.current);
       await peerConnectionRef.current.setLocalDescription(offer);
-      console.log('[SUCCESS] Local description set (offer)');
 
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('offer', offer);
-        console.log('[WEBRTC] Offer sent to partner');
-      }
+      console.log(`[WEBRTC] Sending offer (${browserInfo.browserType})`);
+      socketRef.current.emit('offer', offer);
 
     } catch (error) {
-      console.error('[ERROR] Failed to initiate call:', error);
-      setConnectionStatus('Failed to initiate call');
+      console.error(`[ERROR] Failed to initiate call (${browserInfo.browserType}):`, error);
+      setConnectionStatus('Failed to start call');
+      setDebugInfo(prev => ({
+        ...prev,
+        lastError: `Call initiation failed: ${error.message}`
+      }));
       setTimeout(() => nextPartner(), 2000);
     }
-  }, [localStream, createPeerConnection]);
+  }, [localStream, createPeerConnection, createOffer, browserInfo]);
 
-  // Handle incoming offer
+  // Handle incoming offer with polite/impolite pattern
   const handleOffer = useCallback(async (offer) => {
     if (!localStream) {
-      console.error('[ERROR] Cannot handle offer: missing local stream');
+      console.log(`[ERROR] Cannot handle offer: missing local stream (${browserInfo.browserType})`);
       return;
     }
 
     try {
-      console.log('[WEBRTC] Handling incoming offer...');
+      console.log(`[WEBRTC] Handling offer (${browserInfo.browserType})...`);
       peerConnectionRef.current = createPeerConnection();
 
-      // Add local stream tracks first
+      // Add tracks first
       localStream.getTracks().forEach(track => {
-        console.log('[WEBRTC] Adding local track:', track.kind, track.enabled);
         peerConnectionRef.current.addTrack(track, localStream);
+        console.log(`[WEBRTC] Added ${track.kind} track (${browserInfo.browserType})`);
       });
 
-      // Set remote description
-      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
-      console.log('[SUCCESS] Remote description set');
-
-      // Create and send answer with specific constraints
-      const answer = await peerConnectionRef.current.createAnswer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true
-      });
-
+      await peerConnectionRef.current.setRemoteDescription(offer);
+      
+      const answer = await createAnswer(peerConnectionRef.current);
       await peerConnectionRef.current.setLocalDescription(answer);
-      console.log('[SUCCESS] Local description set (answer)');
 
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('answer', answer);
-        console.log('[WEBRTC] Answer sent to partner');
-      }
+      console.log(`[WEBRTC] Sending answer (${browserInfo.browserType})`);
+      socketRef.current.emit('answer', answer);
 
     } catch (error) {
-      console.error('[ERROR] Failed to handle offer:', error);
-      setConnectionStatus('Failed to connect');
+      console.error(`[ERROR] Failed to handle offer (${browserInfo.browserType}):`, error);
+      setConnectionStatus('Failed to accept call');
+      setDebugInfo(prev => ({
+        ...prev,
+        lastError: `Offer handling failed: ${error.message}`
+      }));
       setTimeout(() => nextPartner(), 2000);
     }
-  }, [localStream, createPeerConnection]);
+  }, [localStream, createPeerConnection, createAnswer, browserInfo]);
 
-  // Handle call answer
   const handleAnswer = useCallback(async (answer) => {
-    if (!peerConnectionRef.current) {
-      console.log('[ERROR] Cannot handle answer: no peer connection');
-      return;
-    }
+    if (!peerConnectionRef.current) return;
 
     try {
-      await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-      console.log('[SUCCESS] Call answer processed');
+      await peerConnectionRef.current.setRemoteDescription(answer);
+      console.log(`[SUCCESS] Answer processed (${browserInfo.browserType})`);
     } catch (error) {
-      console.error('[ERROR] Failed to handle answer:', error);
+      console.error(`[ERROR] Failed to handle answer (${browserInfo.browserType}):`, error);
+      setDebugInfo(prev => ({
+        ...prev,
+        lastError: `Answer handling failed: ${error.message}`
+      }));
     }
-  }, []);
+  }, [browserInfo]);
 
-  // Handle ICE candidates
   const handleIceCandidate = useCallback(async (candidate) => {
-    if (!peerConnectionRef.current) {
-      console.log('[ERROR] Cannot handle ICE candidate: no peer connection');
-      return;
-    }
+    if (!peerConnectionRef.current) return;
 
     try {
-      await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-      console.log('[WEBRTC] ICE candidate added');
+      await peerConnectionRef.current.addIceCandidate(candidate);
+      console.log(`[ICE] Candidate added (${browserInfo.browserType})`);
     } catch (error) {
-      console.error('[ERROR] Failed to add ICE candidate:', error);
+      console.error(`[ERROR] Failed to add ICE candidate (${browserInfo.browserType}):`, error);
     }
-  }, []);
+  }, [browserInfo]);
 
-  // Find a partner
   const findPartner = useCallback(() => {
     if (!socketRef.current?.connected) {
-      console.log('[ERROR] Cannot find partner: not connected to server');
       setTimeout(() => findPartner(), 3000);
       return;
     }
 
-    console.log('[SEARCH] Looking for partner...');
+    console.log(`[SEARCH] Looking for partner (${browserInfo.browserType})...`);
     setConnectionStatus('Looking for partner...');
     setIsConnecting(false);
     setError(null);
@@ -1034,65 +969,27 @@ const VideoChat = ({ user, updateUser }) => {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
-
+    
     setRemoteStream(null);
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
 
-    // Emit find partner with user data
+    // Send enhanced user data with browser info
     const userData = {
       userId: user.id,
       gender: user.gender,
       preferredGender: user.preferredGender,
-      hasFilterCredit: user.filterCredits > 0 || user.isPremium
+      hasFilterCredit: user.filterCredits > 0 || user.isPremium,
+      browserInfo: browserInfo
     };
 
-    console.log('[SEARCH] Sending user data:', userData);
+    console.log(`[SEARCH] Sending user data (${browserInfo.browserType}):`, userData);
     socketRef.current.emit('findPartner', userData);
-  }, [user]);
+  }, [user, browserInfo]);
 
-  // Toggle audio
-  const toggleAudio = useCallback(() => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioEnabled;
-        setAudioEnabled(!audioEnabled);
-        console.log(`[AUDIO] Audio ${!audioEnabled ? 'enabled' : 'disabled'}`);
-      }
-    }
-  }, [localStream, audioEnabled]);
-
-  // Toggle video
-  const toggleVideo = useCallback(() => {
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoEnabled;
-        setVideoEnabled(!videoEnabled);
-        console.log(`[VIDEO] Video ${!videoEnabled ? 'enabled' : 'disabled'}`);
-      }
-    }
-  }, [localStream, videoEnabled]);
-
-  // Report current partner
-  const reportPartner = useCallback(() => {
-    setShowReportModal(true);
-  }, []);
-
-  // Submit report
-  const submitReport = useCallback(() => {
-    if (reportReason && socketRef.current?.connected) {
-      console.log('[REPORT] Submitting report:', reportReason);
-      socketRef.current.emit('reportUser', { reason: reportReason });
-      setReportReason('');
-    }
-  }, [reportReason]);
-
-  // End call and find next partner
   const nextPartner = useCallback(() => {
-    console.log('[NEXT] Finding next partner...');
+    console.log(`[NEXT] Finding next partner (${browserInfo.browserType})...`);
     clearTimeout(connectionTimeoutRef.current);
     
     if (peerConnectionRef.current) {
@@ -1105,18 +1002,11 @@ const VideoChat = ({ user, updateUser }) => {
     }
 
     setRemoteStream(null);
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null;
-    }
+    setTimeout(() => findPartner(), 1000);
+  }, [findPartner, browserInfo]);
 
-    setTimeout(() => {
-      findPartner();
-    }, 1000);
-  }, [findPartner]);
-
-  // Stop call and go home
   const stopCall = useCallback(() => {
-    console.log('[STOP] Stopping call and going home');
+    console.log(`[STOP] Stopping call and going home (${browserInfo.browserType})`);
     clearTimeout(connectionTimeoutRef.current);
     clearTimeout(reconnectTimeoutRef.current);
 
@@ -1140,9 +1030,42 @@ const VideoChat = ({ user, updateUser }) => {
     }
 
     navigate('/');
-  }, [localStream, navigate]);
+  }, [localStream, navigate, browserInfo]);
 
-  // Retry connection
+  const toggleAudio = useCallback(() => {
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioEnabled;
+        setAudioEnabled(!audioEnabled);
+        console.log(`[AUDIO] Audio ${!audioEnabled ? 'enabled' : 'disabled'} (${browserInfo.browserType})`);
+      }
+    }
+  }, [localStream, audioEnabled, browserInfo]);
+
+  const toggleVideo = useCallback(() => {
+    if (localStream) {
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoEnabled;
+        setVideoEnabled(!videoEnabled);
+        console.log(`[VIDEO] Video ${!videoEnabled ? 'enabled' : 'disabled'} (${browserInfo.browserType})`);
+      }
+    }
+  }, [localStream, videoEnabled, browserInfo]);
+
+  const reportPartner = useCallback(() => {
+    setShowReportModal(true);
+  }, []);
+
+  const submitReport = useCallback(() => {
+    if (reportReason && socketRef.current?.connected) {
+      console.log(`[REPORT] Submitting report (${browserInfo.browserType}):`, reportReason);
+      socketRef.current.emit('reportUser', { reason: reportReason });
+      setReportReason('');
+    }
+  }, [reportReason, browserInfo]);
+
   const retryConnection = useCallback(() => {
     setError(null);
     setRetryCount(0);
@@ -1150,27 +1073,24 @@ const VideoChat = ({ user, updateUser }) => {
     initializeSocket();
   }, [initializeSocket]);
 
-  // Toggle stats display
-  const toggleStats = useCallback(() => {
-    setShowStats(!showStats);
-  }, [showStats]);
-
   // Initialize everything
   useEffect(() => {
     const init = async () => {
       try {
+        console.log(`[INIT] Browser info: ${browserInfo.browserType} (Mobile: ${browserInfo.isMobile}, iOS: ${browserInfo.isIOS})`);
         await getUserMedia();
         initializeSocket();
       } catch (error) {
-        console.error('[ERROR] Initialization failed:', error);
+        console.error(`[ERROR] Initialization failed (${browserInfo.browserType}):`, error);
+        setConnectionStatus('Initialization failed');
+        setError('Failed to access camera/microphone. Please allow permissions and refresh.');
       }
     };
 
     init();
 
-    // Cleanup on unmount
     return () => {
-      console.log('[CLEANUP] Cleaning up VideoChat component');
+      console.log(`[CLEANUP] Cleaning up VideoChat component (${browserInfo.browserType})`);
       clearTimeout(connectionTimeoutRef.current);
       clearTimeout(reconnectTimeoutRef.current);
 
@@ -1190,24 +1110,30 @@ const VideoChat = ({ user, updateUser }) => {
         socketRef.current.disconnect();
       }
     };
-  }, [getUserMedia, initializeSocket]);
+  }, [getUserMedia, initializeSocket, browserInfo]);
 
-  // Auto-find partner when local stream is ready
+  // Auto-find partner when ready
   useEffect(() => {
-    if (localStream && socketRef.current?.connected && !isConnecting && connectionStatus !== 'Connected') {
-      console.log('[AUTO] Auto-finding partner...');
+    if (localStream && socketRef.current?.connected && connectionStatus === 'Connected to server') {
       const timer = setTimeout(() => findPartner(), 1000);
       return () => clearTimeout(timer);
     }
-  }, [localStream, findPartner, isConnecting, connectionStatus]);
+  }, [localStream, connectionStatus, findPartner]);
 
   // Redirect to home if no user data
   useEffect(() => {
     if (!user.id || !user.gender) {
-      console.log('[ERROR] No user data, redirecting to home');
+      console.log(`[ERROR] No user data, redirecting to home (${browserInfo.browserType})`);
       navigate('/');
     }
-  }, [user, navigate]);
+  }, [user, navigate, browserInfo]);
+
+  // Handle iOS video click to play
+  const handleVideoClick = useCallback(() => {
+    if (browserInfo.isIOS && remoteVideoRef.current) {
+      remoteVideoRef.current.play().catch(console.error);
+    }
+  }, [browserInfo]);
 
   if (error && error.includes('Camera/microphone')) {
     return (
@@ -1225,50 +1151,23 @@ const VideoChat = ({ user, updateUser }) => {
       <ConnectionStatus status={connectionStatus.toLowerCase().includes('connected') ? 'connected' : 
                                 connectionStatus.toLowerCase().includes('connecting') ? 'connecting' : 'disconnected'}>
         {connectionStatus}
+        {browserInfo.isIOS && connectionStatus.includes('Tap') && ' 👆'}
       </ConnectionStatus>
 
       {process.env.NODE_ENV === 'development' && (
         <DebugPanel>
-          <div><strong>Debug Info:</strong></div>
+          <div><strong>Debug Info ({browserInfo.browserType}):</strong></div>
           <div>Local Tracks: {debugInfo.localStreamTracks}</div>
           <div>Remote Tracks: {debugInfo.remoteStreamTracks}</div>
           <div>ICE State: {debugInfo.iceConnectionState}</div>
           <div>Conn State: {debugInfo.connectionState}</div>
           <div>Signal State: {debugInfo.signalingState}</div>
           <div>ICE Gathering: {debugInfo.iceGatheringState}</div>
-          <div>Last Error: {debugInfo.lastError || 'None'}</div>
-          <div>Status: {connectionStatus}</div>
-          <div>Connecting: {isConnecting ? 'Yes' : 'No'}</div>
-          <div>Has Remote: {remoteStream ? 'Yes' : 'No'}</div>
+          <div>Strategy: {connectionStrategy?.type || 'none'}</div>
+          <div>Polite Mode: {isPoliteMode ? 'Yes' : 'No'}</div>
+          <div>Last Error: {debugInfo.lastError ? debugInfo.lastError.substring(0, 30) + '...' : 'None'}</div>
           <div>Retry Count: {retryCount}</div>
         </DebugPanel>
-      )}
-
-      {showStats && (
-        <StatsOverlay>
-          <div className="stat-row">
-            <span>Quality:</span>
-            <span className={`quality-${connectionStats.quality}`}>
-              {connectionStats.quality}
-            </span>
-          </div>
-          <div className="stat-row">
-            <span>Received:</span>
-            <span>{Math.round(connectionStats.bytesReceived / 1024)}KB</span>
-          </div>
-          <div className="stat-row">
-            <span>Sent:</span>
-            <span>{Math.round(connectionStats.bytesSent / 1024)}KB</span>
-          </div>
-          <div className="stat-row">
-            <span>Lost Packets:</span>
-            <span>{connectionStats.packetsLost}</span>
-          </div>
-          <div className="stat-row">
-            <span>Retries:</span>
-            <span>{retryCount}</span>
-          </div>
-        </StatsOverlay>
       )}
 
       <VideoContainer>
@@ -1282,7 +1181,7 @@ const VideoChat = ({ user, updateUser }) => {
           />
           {!localStream && (
             <PlaceholderMessage>
-              📷 Starting camera...
+              📷 Starting camera ({browserInfo.browserType})...
             </PlaceholderMessage>
           )}
         </VideoWrapper>
@@ -1294,13 +1193,15 @@ const VideoChat = ({ user, updateUser }) => {
               ref={remoteVideoRef}
               autoPlay
               playsInline
+              onClick={handleVideoClick}
+              style={{ cursor: browserInfo.isIOS ? 'pointer' : 'default' }}
             />
           ) : (
             <PlaceholderMessage>
               {isConnecting ? '🔄 Connecting...' :
                error && !error.includes('Camera/microphone') ? '⚠️ Connection error' :
                connectionStatus.includes('Looking') ? '👋 Looking for partner...' :
-               connectionStatus.includes('Partner disconnected') ? '💔 Partner left' :
+               connectionStatus.includes('Partner left') ? '💔 Partner left' :
                connectionStatus.includes('server') ? '🌐 Connecting to server...' :
                '💭 Waiting for partner...'}
             </PlaceholderMessage>
@@ -1355,16 +1256,6 @@ const VideoChat = ({ user, updateUser }) => {
         >
           ❌
         </ControlButton>
-
-        {process.env.NODE_ENV === 'development' && (
-          <ControlButton
-            className="control"
-            onClick={toggleStats}
-            title="Toggle Stats"
-          >
-            📊
-          </ControlButton>
-        )}
       </Controls>
 
       {error && !error.includes('Camera/microphone') && !error.includes('banned') && (
