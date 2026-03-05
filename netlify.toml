@@ -1,6 +1,6 @@
 [build]
   publish = "."
-  command = "echo 'Admin panel - no build needed'"
+  command = "npm install"
 
 [build.environment]
   NODE_VERSION = "18"
