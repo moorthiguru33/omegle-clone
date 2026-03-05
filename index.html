@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TamilPSD — Admin Control Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060810;
+  --s1: #0d0f1a;
+  --s2: #111320;
+  --s3: #161828;
+  --border: #1c1e2e;
+  --border2: #232538;
+  --accent: #D91A2A;
+  --accent2: #FF6B35;
+  --gold: #F0B429;
+  --green: #00E676;
+  --blue: #00B4D8;
+  --purple: #9B5DE5;
+  --text: #E8E9F3;
+  --muted: #4A4B6A;
+  --muted2: #6B6C8E;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Space Grotesk', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{color:var(--text);font-family:var(--sans);font-size:13px}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* === LOGIN === */
+#login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:999;background:var(--bg)}
+#login::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 50%, rgba(217,26,42,0.06) 0%, transparent 70%);pointer-events:none}
+.lcard{width:380px;background:var(--s1);border:1px solid var(--border2);border-top:3px solid var(--accent);padding:40px 36px;position:relative}
+.lcard::after{content:'ADMIN PANEL';position:absolute;top:-10px;left:24px;background:var(--accent);color:#fff;font-size:8px;font-weight:700;padding:2px 10px;letter-spacing:3px}
+.lcard h1{font-size:28px;font-weight:700;margin-bottom:4px;letter-spacing:-0.5px}.lcard h1 span{color:var(--accent)}
+.lcard p{color:var(--muted2);font-size:12px;margin-bottom:28px}
+.fi{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:11px 14px;font-family:var(--mono);font-size:12px;outline:none;margin-bottom:12px;transition:border .2s}
+.fi:focus{border-color:var(--accent)}
+.fb{width:100%;background:var(--accent);color:#fff;border:none;padding:13px;font-family:var(--sans);font-weight:700;font-size:13px;cursor:pointer;letter-spacing:0.5px;transition:all .2s}
+.fb:hover{background:#bf1623}
+.lerr{color:#ff4466;font-size:11px;margin-top:8px;display:none}
+
+/* === SHELL === */
+#shell{display:none;height:100vh;flex-direction:column}
+/* Top bar */
+.topbar{height:52px;background:var(--s1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px;flex-shrink:0}
+.tlogo{font-size:16px;font-weight:700;letter-spacing:-0.3px}.tlogo span{color:var(--accent)}
+.tver{background:var(--border2);color:var(--muted2);font-size:9px;padding:2px 7px;letter-spacing:2px;text-transform:uppercase;font-family:var(--mono)}
+.tspacer{flex:1}
+.tstatus{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2)}
+.tdot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.tbtn{background:transparent;border:1px solid var(--border);color:var(--muted2);padding:5px 12px;font-family:var(--sans);font-size:10px;cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all .2s}
+.tbtn:hover{border-color:var(--text);color:var(--text)}.tbtn.danger:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Nav */
+.nav{display:flex;background:var(--s1);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0}
+.nav::-webkit-scrollbar{height:0}
+.navt{display:flex;align-items:center;gap:7px;padding:11px 18px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);cursor:pointer;border-right:1px solid var(--border);white-space:nowrap;transition:all .2s;position:relative}
+.navt .ni{font-size:14px}
+.navt::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:transparent;transition:background .2s}
+.navt:hover{color:var(--text);background:rgba(255,255,255,.02)}
+.navt.act{color:var(--accent);background:rgba(217,26,42,.05)}.navt.act::after{background:var(--accent)}
+.nbadge{background:var(--green);color:#000;font-size:8px;padding:1px 5px;font-weight:700;min-width:18px;text-align:center}
+
+/* Workspace */
+.ws{flex:1;overflow:hidden;display:flex}
+.panel{display:none;flex:1;overflow:hidden;flex-direction:column}
+.panel.act{display:flex}
+.pscroll{flex:1;overflow-y:auto;padding:20px}
+
+/* Common UI */
+.card{background:var(--s1);border:1px solid var(--border);padding:18px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card-title .ci{font-size:16px}
+.btn{background:transparent;border:1px solid var(--border2);color:var(--text);padding:8px 16px;font-family:var(--sans);font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.5px;transition:all .2s}
+.btn:hover{border-color:var(--text)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{opacity:.85}
+.btn.success{background:var(--green);border-color:var(--green);color:#000}.btn.success:hover{opacity:.85}
+.btn.warning{border-color:var(--gold);color:var(--gold)}.btn.warning:hover{background:rgba(240,180,41,.1)}
+.btn.danger{border-color:var(--accent);color:var(--accent)}.btn.danger:hover{background:rgba(217,26,42,.1)}
+.btn.blue{border-color:var(--blue);color:var(--blue)}.btn.blue:hover{background:rgba(0,180,216,.1)}
+.fr{margin-bottom:12px}
+.fr label{display:block;font-size:10px;color:var(--muted2);letter-spacing:1px;margin-bottom:5px;text-transform:uppercase;font-weight:600}
+.fr input,.fr textarea,.fr select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;font-family:var(--mono);font-size:11px;outline:none;transition:border .2s}
+.fr input:focus,.fr textarea:focus,.fr select:focus{border-color:var(--accent2)}
+.fr textarea{resize:vertical;min-height:70px;line-height:1.6}
+.fr select option{background:var(--s2)}
+.fh{font-size:10px;color:var(--muted);margin-top:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.row{display:flex;gap:10px;align-items:flex-end}
+.row>.fr{flex:1;margin-bottom:0}
+.row>.btn{flex-shrink:0;height:38px}
+.sep{height:1px;background:var(--border);margin:16px 0}
+
+/* Status badges */
+.badge{display:inline-block;font-size:8px;padding:2px 7px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-family:var(--mono)}
+.badge.green{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.25)}
+.badge.red{background:rgba(217,26,42,.12);color:var(--accent);border:1px solid rgba(217,26,42,.25)}
+.badge.gold{background:rgba(240,180,41,.12);color:var(--gold);border:1px solid rgba(240,180,41,.25)}
+.badge.blue{background:rgba(0,180,216,.12);color:var(--blue);border:1px solid rgba(0,180,216,.25)}
+
+/* Notifications */
+#notif{position:fixed;top:66px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.nf{background:var(--s2);border-left:3px solid var(--green);padding:10px 16px;font-size:11px;max-width:360px;animation:slideIn .3s ease;pointer-events:auto;border:1px solid var(--border2);border-left:3px solid var(--green)}
+.nf.err{border-left-color:var(--accent)}.nf.warn{border-left-color:var(--gold)}
+@keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
+
+/* LOG */
+.logwrap{display:flex;flex-direction:column;height:100%;overflow:hidden}
+.logtop{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--s2);flex-shrink:0}
+.logtitle{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);font-family:var(--mono)}
+#logbox{flex:1;overflow-y:auto;padding:12px 16px;font-size:11px;line-height:2;background:var(--bg);font-family:var(--mono)}
+.lo{color:var(--green)}.lw{color:var(--gold)}.le{color:var(--accent)}.ld{color:var(--muted2)}.lv{color:var(--purple)}.lb{color:var(--blue)}
+
+/* === PANEL 1: EXCEL PROCESSOR === */
+.proc-layout{display:flex;flex:1;overflow:hidden}
+.proc-left{width:380px;min-width:380px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:var(--s1)}
+.proc-section{padding:16px;border-bottom:1px solid var(--border)}
+.proc-shead{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.step-num{width:20px;height:20px;border-radius:50%;background:var(--border2);color:var(--muted2);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .3s}
+.step-num.act{background:var(--accent);color:#fff}.step-num.done{background:var(--green);color:#000}
+#dropzone{border:2px dashed var(--border2);padding:22px;text-align:center;cursor:pointer;font-size:11px;color:var(--muted2);transition:all .2s;background:var(--bg)}
+#dropzone:hover{border-color:var(--accent2);color:var(--accent2);background:rgba(255,107,53,.03)}
+#dropzone.ok{border-color:var(--green);color:var(--green);background:rgba(0,230,118,.03)}
+#file-input{display:none}
+.thumb-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-top:8px;max-height:80px;overflow:hidden}
+.timg{width:100%;aspect-ratio:1;object-fit:cover;border:1px solid var(--border)}
+.timg.new{border-color:var(--green)}.timg.skip{border-color:var(--gold);opacity:.4}.timg.up{border-color:var(--purple)}
+.progbar{height:3px;background:var(--border);overflow:hidden;margin-top:10px}
+.progfill{height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));width:0%;transition:width .3s}
+.progtext{font-size:9px;color:var(--muted2);margin-top:4px;font-family:var(--mono)}
+.stats-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.sm{background:var(--bg);border:1px solid var(--border);padding:8px;text-align:center}
+.sm-n{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent2)}.sm-l{font-size:8px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase}
+.bigrun{width:100%;background:linear-gradient(135deg,var(--accent),#c41020);color:#fff;border:none;padding:15px;font-family:var(--sans);font-weight:700;font-size:14px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .3s}
+.bigrun:hover{box-shadow:0 0 20px rgba(217,26,42,.4)}.bigrun:disabled{background:var(--border2);color:var(--muted);cursor:not-allowed;box-shadow:none}
+.proc-right{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.phtabs{display:flex;border-bottom:1px solid var(--border);background:var(--s1);flex-shrink:0}
+.phtab{padding:9px 16px;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);cursor:pointer;border-right:1px solid var(--border);transition:all .2s;position:relative}
+.phtab.act{color:var(--accent2)}.phtab.act::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--accent2)}
+.phtab.done{color:var(--green)}
+/* Excel table */
+.xt-wrap{flex:1;overflow:auto;padding:0}
+.xt{width:100%;border-collapse:collapse;font-size:10px}
+.xt th{background:var(--s3);border:1px solid var(--border2);padding:8px 12px;text-align:left;font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);white-space:nowrap;position:sticky;top:0;z-index:2;font-family:var(--mono)}
+.xt td{border:1px solid var(--border);padding:7px 12px;vertical-align:top;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default}
+.xt td:hover{white-space:normal;background:rgba(255,107,53,.04)}
+.xt tr.rnew td{background:rgba(0,230,118,.025)}.xt tr.rold td{background:rgba(255,255,255,.01);opacity:.6}
+
+/* === PANEL 2: SETTINGS === */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.img-upload-box{border:2px dashed var(--border2);padding:28px;text-align:center;cursor:pointer;color:var(--muted2);font-size:11px;transition:all .2s;background:var(--bg);position:relative;overflow:hidden}
+.img-upload-box:hover{border-color:var(--accent2);color:var(--accent2);background:rgba(255,107,53,.03)}
+.img-upload-box .icon{font-size:32px;margin-bottom:8px}
+.img-preview{width:100%;height:130px;object-fit:cover;border:1px solid var(--border);display:none;margin-bottom:8px}
+.img-preview.show{display:block}
+.price-display{font-family:var(--mono);font-size:42px;font-weight:700;color:var(--accent);text-align:center;padding:16px 0;letter-spacing:-1px}
+.price-display span{font-size:16px;color:var(--muted2);font-weight:400}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg);border:1px solid var(--border);cursor:pointer;margin-bottom:6px;transition:all .2s}
+.toggle-row:hover{border-color:var(--border2)}.toggle-row.on{border-color:rgba(0,230,118,.3);background:rgba(0,230,118,.025)}
+.tog-info{flex:1}
+.tog-name{font-size:12px;font-weight:600}.tog-desc{font-size:10px;color:var(--muted2);margin-top:1px}
+.tog{width:32px;height:18px;border-radius:9px;background:var(--border2);position:relative;flex-shrink:0;transition:background .2s;margin-left:12px}
+.tog.on{background:var(--green)}.tog::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s}
+.tog.on::after{left:16px}
+.color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px}
+.cc{width:100%;aspect-ratio:1;border-radius:3px;cursor:pointer;border:2px solid transparent;transition:border .2s}
+.cc:hover,.cc.sel{border-color:#fff}
+
+/* === PANEL 3: VIP === */
+.vip-layout{display:flex;flex:1;overflow:hidden}
+.vip-left{width:380px;min-width:380px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--s1)}
+.vip-header{padding:14px 16px;border-bottom:1px solid var(--border);background:var(--s2);flex-shrink:0}
+.vip-count{font-family:var(--mono);font-size:32px;font-weight:700;color:var(--green)}
+.vip-lbl{font-size:10px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase}
+.vip-list{flex:1;overflow-y:auto;padding:8px}
+.vip-item{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg);border:1px solid var(--border);margin-bottom:4px;font-size:11px;transition:all .2s}
+.vip-item:hover{border-color:var(--border2)}.vip-item .ve{flex:1;font-family:var(--mono);color:var(--green);font-size:10px}
+.vip-item .vd{background:transparent;border:none;color:var(--muted);cursor:pointer;padding:2px 6px;font-size:15px;transition:color .2s;line-height:1}
+.vip-item .vd:hover{color:var(--accent)}
+.vip-add{padding:14px 16px;border-top:1px solid var(--border);background:var(--s2);flex-shrink:0}
+.vip-right{flex:1;overflow-y:auto;padding:20px}
+.bulk-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:12px;font-family:var(--mono);font-size:11px;outline:none;resize:vertical;min-height:180px;line-height:1.7}
+.bulk-input:focus{border-color:var(--green)}
+
+/* === PANEL 4: ADS === */
+.ads-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.ad-card{background:var(--s1);border:1px solid var(--border);overflow:hidden}
+.ad-head{padding:12px 16px;border-bottom:1px solid var(--border);background:var(--s2);display:flex;align-items:center;justify-content:space-between}
+.ad-name{font-size:13px;font-weight:700}
+.ad-type{font-size:8px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;font-family:var(--mono)}
+.ad-body{padding:16px}
+.ad-preview{width:100%;height:100px;background:var(--bg);border:2px dashed var(--border2);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px;margin-bottom:12px;overflow:hidden;cursor:pointer;transition:all .2s;position:relative}
+.ad-preview:hover{border-color:var(--accent2);color:var(--accent2)}
+.ad-preview img{max-width:100%;max-height:100%;object-fit:contain}
+.ad-preview .ap-overlay{position:absolute;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+.ad-preview:hover .ap-overlay{opacity:1}
+
+/* === PANEL 5: GITHUB PUSH === */
+.gh-layout{display:flex;flex:1;overflow:hidden;gap:0}
+.gh-left{width:340px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.gh-filelist{flex:1;overflow-y:auto;padding:8px}
+.gh-file{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg);border:1px solid var(--border);margin-bottom:4px;cursor:pointer;transition:all .2s}
+.gh-file:hover{border-color:var(--border2)}.gh-file.sel{border-color:var(--accent2);background:rgba(255,107,53,.04)}
+.gh-file.pushed{border-color:var(--green);opacity:.6}
+.gh-fp{font-size:10px;font-family:var(--mono);color:var(--text)}.gh-ft{font-size:9px;color:var(--muted2)}
+.gh-right{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:20px;gap:16px;overflow-y:auto}
+.push-btn{width:100%;background:linear-gradient(135deg,var(--green),#00b356);color:#000;border:none;padding:18px;font-family:var(--sans);font-weight:700;font-size:16px;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .3s}
+.push-btn:hover{box-shadow:0 0 24px rgba(0,230,118,.35)}.push-btn:disabled{background:var(--border2);color:var(--muted);cursor:not-allowed;box-shadow:none}
+.commit-hist{background:var(--bg);border:1px solid var(--border);padding:10px 14px;font-family:var(--mono);font-size:10px;max-height:200px;overflow-y:auto;line-height:2}
+.ch-line{color:var(--muted2)}.ch-sha{color:var(--blue)}.ch-msg{color:var(--text)}.ch-time{color:var(--muted)}
+
+/* === PANEL 6: BG REMOVER === */
+.bgr-layout{display:flex;flex:1;overflow:hidden}
+.bgr-left{width:360px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:var(--s1)}
+.bgr-right{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.bgr-canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;background:repeating-conic-gradient(#1a1b28 0% 25%, #0d0f1a 0% 50%) 0 0/20px 20px}
+#bgr-canvas{max-width:100%;max-height:100%;border:2px solid var(--border)}
+.bgr-bottom{padding:14px 16px;border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0;background:var(--s2)}
+.bgr-progress{padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0;display:none}
+.bgr-progress.show{display:block}
+.bgr-pb{height:4px;background:var(--border);overflow:hidden}
+.bgr-pf{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));width:0%;transition:width .4s}
+.bgr-pt{font-size:10px;color:var(--muted2);margin-top:5px;font-family:var(--mono)}
+.batch-list{flex:1;overflow-y:auto;padding:8px}
+.batch-item{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);margin-bottom:3px;font-size:10px}
+.bi-thumb{width:32px;height:32px;object-fit:cover;border:1px solid var(--border);flex-shrink:0}
+.bi-name{flex:1;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bi-status{font-size:8px;padding:2px 6px;font-weight:700;letter-spacing:1px;text-transform:uppercase;flex-shrink:0;font-family:var(--mono)}
+.bi-status.wait{background:rgba(74,75,106,.3);color:var(--muted2)}
+.bi-status.proc{background:rgba(0,180,216,.15);color:var(--blue)}
+.bi-status.done{background:rgba(0,230,118,.12);color:var(--green)}
+.bi-status.err{background:rgba(217,26,42,.12);color:var(--accent)}
+
+/* === PANEL 7: SITE ANALYTICS (simple) === */
+.dash-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.dash-card{background:var(--s1);border:1px solid var(--border);padding:18px;position:relative;overflow:hidden}
+.dash-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent)}
+.dash-card.g::before{background:var(--green)}.dash-card.b::before{background:var(--blue)}.dash-card.p::before{background:var(--purple)}
+.dc-n{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--text)}
+.dc-l{font-size:10px;color:var(--muted2);margin-top:4px;letter-spacing:0.5px}
+.dc-c{font-size:10px;color:var(--green);margin-top:4px}
+
+/* Responsive */
+@media(max-width:900px){
+  .settings-grid,.ads-grid,.dash-grid{grid-template-columns:1fr}
+  .proc-left,.vip-left,.bgr-left{width:100%;min-width:unset;border-right:none;border-bottom:1px solid var(--border);max-height:300px}
+  .proc-layout,.vip-layout,.bgr-layout{flex-direction:column}
+  .gh-layout{flex-direction:column}.gh-left{width:100%;border-right:none;border-bottom:1px solid var(--border);max-height:260px}
+  .grid2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ LOGIN ═══════════════════════════════ -->
+<div id="login">
+  <div class="lcard">
+    <h1>Tamil<span>PSD</span></h1>
+    <p>Separate Admin Control Panel — Netlify Hosted</p>
+    <input class="fi" type="password" id="lpw" placeholder="Admin Password" autocomplete="current-password">
+    <button class="fb" onclick="doLogin()">UNLOCK PANEL</button>
+    <div class="lerr" id="lerr">❌ Wrong password. Try again.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ SHELL ═══════════════════════════════ -->
+<div id="shell">
+  <!-- Topbar -->
+  <div class="topbar">
+    <span class="tlogo">Tamil<span>PSD</span></span>
+    <span class="tver">ADMIN v6</span>
+    <div class="tstatus"><div class="tdot"></div><span id="ts-text">Connected</span></div>
+    <div class="tspacer"></div>
+    <span style="font-size:10px;color:var(--muted2);font-family:var(--mono)" id="ts-repo">moorthiguru33/kicksliygurulhg</span>
+    <button class="tbtn danger" onclick="doLogout()">LOGOUT</button>
+  </div>
+  <!-- Navigation -->
+  <div class="nav">
+    <div class="navt act" data-tab="proc" onclick="switchTab('proc')"><span class="ni">📊</span>Excel Processor</div>
+    <div class="navt" data-tab="settings" onclick="switchTab('settings')"><span class="ni">⚙️</span>Site Settings</div>
+    <div class="navt" data-tab="vip" onclick="switchTab('vip')"><span class="ni">👑</span>VIP Emails<span class="nbadge" id="vip-count-badge">0</span></div>
+    <div class="navt" data-tab="ads" onclick="switchTab('ads')"><span class="ni">📢</span>Advertisements</div>
+    <div class="navt" data-tab="bgr" onclick="switchTab('bgr')"><span class="ni">✂️</span>BG Remover</div>
+    <div class="navt" data-tab="github" onclick="switchTab('github')"><span class="ni">🚀</span>GitHub Push</div>
+    <div class="navt" data-tab="dashboard" onclick="switchTab('dashboard')"><span class="ni">📈</span>Dashboard</div>
+  </div>
+  <!-- Workspace -->
+  <div class="ws">
+
+    <!-- ═══ PANEL 1: EXCEL PROCESSOR ═══ -->
+    <div class="panel act" id="panel-proc">
+      <div class="proc-layout">
+        <!-- Left sidebar: steps -->
+        <div class="proc-left">
+          <!-- Step 1: MediaFire/GDrive URLs -->
+          <div class="proc-section">
+            <div class="proc-shead"><span class="step-num act" id="sn1">1</span>Download Source URLs</div>
+            <div class="fr">
+              <label>MediaFire / Google Drive Folder URLs</label>
+              <textarea class="fi" id="dl-urls" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;font-family:var(--mono);font-size:10px;width:100%;outline:none;resize:vertical;min-height:60px;line-height:1.7" placeholder="https://www.mediafire.com/folder/...&#10;https://drive.google.com/drive/folders/..."></textarea>
+            </div>
+            <button class="btn blue" style="width:100%" onclick="fetchDownloadLinks()">📡 FETCH FILE LINKS</button>
+            <div id="dl-status" style="font-size:10px;color:var(--muted2);margin-top:8px;font-family:var(--mono)"></div>
+          </div>
+          <!-- Step 2: Images -->
+          <div class="proc-section">
+            <div class="proc-shead"><span class="step-num" id="sn2">2</span>Upload Images Folder</div>
+            <div id="dropzone" onclick="document.getElementById('file-input').click()">
+              <div style="font-size:28px;margin-bottom:6px">📁</div>
+              <div>Click or drag images here</div>
+              <div style="font-size:10px;margin-top:4px;color:var(--muted)">JPG/PNG/WEBP — batch select</div>
+            </div>
+            <input type="file" id="file-input" multiple accept="image/*" onchange="handleImages(this.files)">
+            <div class="thumb-grid" id="thumb-grid"></div>
+            <div class="progbar"><div class="progfill" id="progfill"></div></div>
+            <div class="progtext" id="progtext"></div>
+            <div class="stats-mini" id="stats-mini" style="display:none">
+              <div class="sm"><div class="sm-n" id="st-new">0</div><div class="sm-l">New</div></div>
+              <div class="sm"><div class="sm-n" id="st-skip">0</div><div class="sm-l">Skip</div></div>
+              <div class="sm"><div class="sm-n" id="st-up">0</div><div class="sm-l">Upload</div></div>
+            </div>
+          </div>
+          <!-- Step 3: Options -->
+          <div class="proc-section">
+            <div class="proc-shead"><span class="step-num" id="sn3">3</span>AI Generation Options</div>
+            <div class="fr">
+              <label>Vision Model</label>
+              <select id="groq-model" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:var(--mono);font-size:11px;outline:none">
+                <option value="llama-3.2-90b-vision-preview">LLaMA 3.2 90B Vision (Best)</option>
+                <option value="llama-3.2-11b-vision-preview">LLaMA 3.2 11B Vision (Fast)</option>
+                <option value="llama-3.3-70b-versatile">LLaMA 3.3 70B (Text Only)</option>
+              </select>
+            </div>
+            <div class="fr">
+              <label>Content Language</label>
+              <select id="groq-lang" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:var(--mono);font-size:11px;outline:none">
+                <option value="english">English</option>
+                <option value="tamil">Tamil</option>
+                <option value="mixed">Tamil + English Mix</option>
+              </select>
+            </div>
+            <div class="fr">
+              <label>Min Description Words</label>
+              <select id="groq-words" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:var(--mono);font-size:11px;outline:none">
+                <option value="400">400 words</option>
+                <option value="600" selected>600 words</option>
+                <option value="800">800 words</option>
+                <option value="1000">1000 words</option>
+              </select>
+            </div>
+          </div>
+          <!-- Run button -->
+          <div style="padding:14px 16px;margin-top:auto;border-top:1px solid var(--border)">
+            <button class="bigrun" id="run-btn" onclick="startProcessing()" disabled>⚡ START AI PROCESSING</button>
+            <button class="btn danger" id="stop-btn" style="width:100%;margin-top:8px;display:none" onclick="stopProcessing()">■ STOP</button>
+          </div>
+        </div>
+        <!-- Right: log + table -->
+        <div class="proc-right">
+          <div class="phtabs">
+            <div class="phtab act" id="ptab-log" onclick="switchProcTab('log')">Live Log</div>
+            <div class="phtab" id="ptab-table" onclick="switchProcTab('table')">Data Preview</div>
+            <div class="phtab" id="ptab-missing" onclick="switchProcTab('missing')">Fill Missing</div>
+          </div>
+          <!-- Log view -->
+          <div id="pview-log" class="logwrap">
+            <div class="logtop">
+              <span class="logtitle">📡 Processing Log</span>
+              <div style="display:flex;gap:8px">
+                <button class="tbtn" onclick="clearLog()">CLEAR</button>
+                <button class="tbtn" onclick="exportLog()">EXPORT</button>
+              </div>
+            </div>
+            <div id="logbox"><span class="ld">// Admin Panel ready. Upload images and start processing...</span></div>
+          </div>
+          <!-- Table view -->
+          <div id="pview-table" style="display:none;flex:1;overflow:hidden;flex-direction:column">
+            <div class="logtop">
+              <span class="logtitle">📋 Excel Preview</span>
+              <div style="display:flex;gap:8px">
+                <button class="tbtn" id="preview-load-btn" onclick="loadExcelPreview()">LOAD FROM GITHUB</button>
+                <button class="tbtn success" id="view-excel-btn" onclick="openExcelModal()">VIEW FULL TABLE</button>
+              </div>
+            </div>
+            <div class="xt-wrap">
+              <table class="xt" id="preview-table"><thead><tr><th>ID</th><th>Title</th><th>Category</th><th>Status</th></tr></thead><tbody id="preview-tbody"><tr><td colspan="4" style="text-align:center;color:var(--muted2);padding:20px">Load data from GitHub</td></tr></tbody></table>
+            </div>
+          </div>
+          <!-- Fill Missing -->
+          <div id="pview-missing" style="display:none;flex:1;overflow:hidden;flex-direction:column">
+            <div class="logtop">
+              <span class="logtitle">🔧 Fill Missing SEO Data</span>
+              <button class="tbtn" onclick="scanMissing()">SCAN MISSING</button>
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:16px">
+              <div class="card">
+                <div class="card-title"><span class="ci">ℹ️</span> Fill Missing Data Tool</div>
+                <p style="font-size:11px;color:var(--muted2);line-height:1.7;margin-bottom:12px">Scans existing designs.json / Excel for rows missing title, description, or tags. Uses AI vision to generate SEO content automatically.</p>
+                <div id="missing-list" style="margin-bottom:12px"></div>
+                <button class="btn primary" onclick="fillAllMissing()" id="fill-btn" disabled>🤖 FILL ALL MISSING</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PANEL 2: SITE SETTINGS ═══ -->
+    <div class="panel" id="panel-settings">
+      <div class="pscroll">
+        <div class="settings-grid">
+          <!-- Hero Background -->
+          <div class="card">
+            <div class="card-title"><span class="ci">🖼️</span> Hero Background Image</div>
+            <div class="img-upload-box" id="hero-dropzone" onclick="document.getElementById('hero-file').click()">
+              <img id="hero-preview" class="img-preview" src="">
+              <div class="icon">🖼️</div>
+              <div>Click to upload new hero background</div>
+              <div style="font-size:10px;margin-top:3px">Recommended: 1920×600px JPG</div>
+            </div>
+            <input type="file" id="hero-file" accept="image/*" style="display:none" onchange="previewHero(this)">
+            <div class="row" style="margin-top:10px">
+              <button class="btn primary" onclick="saveHeroBg()">💾 SAVE HERO BG</button>
+              <button class="btn" onclick="resetHeroBg()">RESET</button>
+            </div>
+            <div class="fh">Saved to: images/hero-bg.jpg in GitHub</div>
+          </div>
+
+          <!-- Subscription Price -->
+          <div class="card">
+            <div class="card-title"><span class="ci">💰</span> Subscription Price</div>
+            <div class="price-display"><span>₹</span><span id="price-display-val">99</span></div>
+            <div class="fr">
+              <label>Monthly Amount (INR)</label>
+              <input type="number" id="price-monthly" placeholder="99" min="1">
+            </div>
+            <div class="fr">
+              <label>Annual Amount (INR)</label>
+              <input type="number" id="price-annual" placeholder="499" min="1">
+            </div>
+            <div class="fr">
+              <label>Price Label / Tagline</label>
+              <input type="text" id="price-label" placeholder="Best Value — Unlimited Downloads">
+            </div>
+            <button class="btn primary" onclick="savePricing()" style="width:100%">💾 SAVE PRICING</button>
+          </div>
+
+          <!-- Site Config -->
+          <div class="card">
+            <div class="card-title"><span class="ci">🌐</span> Site Configuration</div>
+            <div class="fr">
+              <label>Site Title</label>
+              <input type="text" id="cfg-title" placeholder="TamilPSD — Free PSD Downloads">
+            </div>
+            <div class="fr">
+              <label>Site Description (SEO)</label>
+              <textarea id="cfg-desc" placeholder="Free Tamil PSD templates..."></textarea>
+            </div>
+            <div class="fr">
+              <label>Contact Email</label>
+              <input type="email" id="cfg-email" placeholder="admin@tamilpsd.in">
+            </div>
+            <div class="fr">
+              <label>WhatsApp Number</label>
+              <input type="text" id="cfg-wa" placeholder="+91 9876543210">
+            </div>
+            <button class="btn primary" onclick="saveSiteConfig()" style="width:100%">💾 SAVE CONFIG</button>
+          </div>
+
+          <!-- Feature Toggles -->
+          <div class="card">
+            <div class="card-title"><span class="ci">🔀</span> Feature Toggles</div>
+            <div class="toggle-row" id="tog-popup" onclick="toggleFeature('popup')">
+              <div class="tog-info"><div class="tog-name">Popup Advertisement</div><div class="tog-desc">Show/hide popup ad on load</div></div>
+              <div class="tog" id="tog-popup-tog"></div>
+            </div>
+            <div class="toggle-row" id="tog-maintenance" onclick="toggleFeature('maintenance')">
+              <div class="tog-info"><div class="tog-name">Maintenance Mode</div><div class="tog-desc">Show maintenance page to visitors</div></div>
+              <div class="tog" id="tog-maintenance-tog"></div>
+            </div>
+            <div class="toggle-row" id="tog-freeDL" onclick="toggleFeature('freeDL')">
+              <div class="tog-info"><div class="tog-name">Free Download Mode</div><div class="tog-desc">Allow downloads without subscription</div></div>
+              <div class="tog" id="tog-freeDL-tog"></div>
+            </div>
+            <div class="toggle-row" id="tog-newDesigns" onclick="toggleFeature('newDesigns')">
+              <div class="tog-info"><div class="tog-name">"New" Design Badge</div><div class="tog-desc">Show NEW badge on recent uploads</div></div>
+              <div class="tog" id="tog-newDesigns-tog"></div>
+            </div>
+            <div class="toggle-row" id="tog-bgremover" onclick="toggleFeature('bgremover')">
+              <div class="tog-info"><div class="tog-name">BG Remover Tool</div><div class="tog-desc">Enable/disable background remover page</div></div>
+              <div class="tog" id="tog-bgremover-tog"></div>
+            </div>
+            <div style="margin-top:12px">
+              <button class="btn primary" onclick="saveToggles()" style="width:100%">💾 SAVE TOGGLES</button>
+            </div>
+          </div>
+
+          <!-- Hero Text -->
+          <div class="card">
+            <div class="card-title"><span class="ci">✏️</span> Hero Section Text</div>
+            <div class="fr">
+              <label>Hero Headline</label>
+              <input type="text" id="hero-title" placeholder="Free Tamil PSD Templates">
+            </div>
+            <div class="fr">
+              <label>Hero Subtitle</label>
+              <textarea id="hero-subtitle" style="min-height:50px" placeholder="Download premium quality Photoshop files..."></textarea>
+            </div>
+            <div class="fr">
+              <label>CTA Button Text</label>
+              <input type="text" id="hero-cta" placeholder="Browse All Designs">
+            </div>
+            <button class="btn primary" onclick="saveHeroText()" style="width:100%">💾 SAVE HERO TEXT</button>
+          </div>
+
+          <!-- Social Links -->
+          <div class="card">
+            <div class="card-title"><span class="ci">🔗</span> Social Media Links</div>
+            <div class="fr"><label>YouTube</label><input type="url" id="soc-yt" placeholder="https://youtube.com/c/..."></div>
+            <div class="fr"><label>Telegram</label><input type="url" id="soc-tg" placeholder="https://t.me/..."></div>
+            <div class="fr"><label>Instagram</label><input type="url" id="soc-ig" placeholder="https://instagram.com/..."></div>
+            <div class="fr"><label>Facebook</label><input type="url" id="soc-fb" placeholder="https://facebook.com/..."></div>
+            <button class="btn primary" onclick="saveSocials()" style="width:100%">💾 SAVE LINKS</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PANEL 3: VIP EMAILS ═══ -->
+    <div class="panel" id="panel-vip">
+      <div class="vip-layout">
+        <div class="vip-left">
+          <div class="vip-header">
+            <div class="vip-count" id="vip-count-display">0</div>
+            <div class="vip-lbl">Total VIP Members</div>
+            <div style="margin-top:8px;display:flex;gap:6px">
+              <button class="btn success" style="font-size:9px;padding:5px 10px" onclick="loadVipList()">↺ REFRESH</button>
+              <button class="btn danger" style="font-size:9px;padding:5px 10px" onclick="clearAllVip()">CLEAR ALL</button>
+            </div>
+          </div>
+          <div class="vip-list" id="vip-list">
+            <div style="text-align:center;padding:20px;color:var(--muted2);font-size:11px">Loading VIP list...</div>
+          </div>
+          <div class="vip-add">
+            <div class="fr" style="margin-bottom:8px">
+              <label>Add Single Email</label>
+              <div class="row">
+                <input type="email" id="vip-email-input" placeholder="email@example.com" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;font-family:var(--mono);font-size:11px;outline:none;flex:1" onkeydown="if(event.key==='Enter')addVipSingle()">
+                <button class="btn success" onclick="addVipSingle()">+ ADD</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="vip-right">
+          <div class="card">
+            <div class="card-title"><span class="ci">📋</span> Bulk Add VIP Emails</div>
+            <div class="fr">
+              <label>Paste emails (one per line or comma-separated)</label>
+              <textarea class="bulk-input" id="bulk-vip" placeholder="email1@gmail.com&#10;email2@gmail.com&#10;email3@gmail.com"></textarea>
+            </div>
+            <div class="row">
+              <button class="btn success" onclick="addVipBulk()">📥 ADD ALL</button>
+              <button class="btn" onclick="document.getElementById('bulk-vip').value=''">CLEAR</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="ci">🔍</span> Search & Export</div>
+            <div class="row">
+              <div class="fr" style="flex:1;margin-bottom:0">
+                <input type="text" id="vip-search" placeholder="Search emails..." oninput="searchVip(this.value)" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;font-family:var(--mono);font-size:11px;outline:none;width:100%">
+              </div>
+              <button class="btn blue" onclick="exportVipList()">📤 EXPORT CSV</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="ci">⚡</span> VIP Workflow</div>
+            <p style="font-size:11px;color:var(--muted2);line-height:1.8;margin-bottom:12px">
+              1. Add email(s) above → 2. Click "PUSH TO GITHUB" in the GitHub tab → Done!<br>
+              VIP emails are stored as SHA-256 hashes in <code style="color:var(--accent2)">data/vip.json</code> for security.
+            </p>
+            <button class="btn primary" onclick="switchTab('github');prepareVipPush()">🚀 GO TO PUSH →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PANEL 4: ADS ═══ -->
+    <div class="panel" id="panel-ads">
+      <div class="pscroll">
+        <div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:16px;font-weight:700">Advertisement Manager</div>
+            <div style="font-size:11px;color:var(--muted2)">Upload images for ad slots. Changes pushed via GitHub tab.</div>
+          </div>
+          <button class="btn primary" onclick="saveAllAds()">💾 SAVE ALL ADS</button>
+        </div>
+        <div class="ads-grid" id="ads-grid">
+          <!-- Ad slots generated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PANEL 5: BG REMOVER ═══ -->
+    <div class="panel" id="panel-bgr">
+      <div class="bgr-layout">
+        <div class="bgr-left">
+          <div class="proc-section" style="border-bottom:1px solid var(--border)">
+            <div class="proc-shead">Batch Background Removal</div>
+            <div id="bgr-drop" onclick="document.getElementById('bgr-files').click()" style="border:2px dashed var(--border2);padding:20px;text-align:center;cursor:pointer;font-size:11px;color:var(--muted2);transition:all .2s;background:var(--bg)">
+              <div style="font-size:28px;margin-bottom:6px">✂️</div>
+              <div>Click to select images</div>
+              <div style="font-size:10px;margin-top:3px">JPG / PNG — batch</div>
+            </div>
+            <input type="file" id="bgr-files" multiple accept="image/*" style="display:none" onchange="handleBgrImages(this.files)">
+            <div style="margin-top:10px;display:flex;gap:8px">
+              <button class="btn primary" style="flex:1" onclick="runBatchBgr()" id="bgr-run-btn" disabled>▶ PROCESS ALL</button>
+              <button class="btn" onclick="downloadAllBgr()" id="bgr-dl-btn" disabled>⬇ DL ALL</button>
+            </div>
+          </div>
+          <div class="proc-section" style="border-bottom:1px solid var(--border)">
+            <div class="proc-shead">Options</div>
+            <div class="fr">
+              <label>Processing Method</label>
+              <select id="bgr-method" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:var(--mono);font-size:11px;outline:none">
+                <option value="auto">Auto (Best Quality)</option>
+                <option value="fast">Fast (Lower quality)</option>
+              </select>
+            </div>
+            <div class="fr">
+              <label>Output Format</label>
+              <select id="bgr-format" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-family:var(--mono);font-size:11px;outline:none">
+                <option value="png">PNG (Transparent)</option>
+                <option value="webp">WEBP (Smaller)</option>
+              </select>
+            </div>
+          </div>
+          <div class="batch-list" id="batch-list"></div>
+        </div>
+        <div class="bgr-right">
+          <div class="bgr-progress" id="bgr-progress">
+            <div class="bgr-pb"><div class="bgr-pf" id="bgr-pf"></div></div>
+            <div class="bgr-pt" id="bgr-pt">Loading model...</div>
+          </div>
+          <div class="bgr-canvas-wrap">
+            <canvas id="bgr-canvas" width="600" height="400" style="display:none"></canvas>
+            <div id="bgr-placeholder" style="text-align:center;color:var(--muted2)">
+              <div style="font-size:48px;margin-bottom:12px">✂️</div>
+              <div style="font-size:13px;font-weight:600">Background Remover</div>
+              <div style="font-size:11px;margin-top:6px">Powered by @imgly/background-removal</div>
+              <div style="font-size:10px;margin-top:4px;color:var(--muted)">100% local — no server needed</div>
+            </div>
+          </div>
+          <div class="bgr-bottom">
+            <button class="btn blue" onclick="document.getElementById('bgr-single').click()">📁 Single Image</button>
+            <input type="file" id="bgr-single" accept="image/*" style="display:none" onchange="removeSingleBg(this.files[0])">
+            <button class="btn" id="bgr-save-btn" onclick="saveBgrResult()" disabled>💾 SAVE PNG</button>
+            <button class="btn" onclick="clearBgrCanvas()">🗑 CLEAR</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PANEL 6: GITHUB PUSH ═══ -->
+    <div class="panel" id="panel-github">
+      <div class="gh-layout">
+        <div class="gh-left">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border);background:var(--s2);flex-shrink:0">
+            <div style="font-size:11px;font-weight:700">Pending Changes</div>
+            <div style="font-size:10px;color:var(--muted2);margin-top:3px">Files queued for push</div>
+          </div>
+          <div class="gh-filelist" id="gh-pending-list">
+            <div style="text-align:center;padding:20px;color:var(--muted2);font-size:11px">No pending changes.<br>Make changes in other tabs.</div>
+          </div>
+          <div style="padding:12px;border-top:1px solid var(--border);background:var(--s2);flex-shrink:0">
+            <button class="btn" style="width:100%;font-size:10px" onclick="refreshPendingFiles()">↺ REFRESH LIST</button>
+          </div>
+        </div>
+        <div class="gh-right">
+          <div class="card">
+            <div class="card-title"><span class="ci">🔧</span> Repository Settings</div>
+            <div class="grid2">
+              <div class="fr"><label>GitHub Owner</label><input type="text" id="gh-owner" value="moorthiguru33"></div>
+              <div class="fr"><label>Repository Name</label><input type="text" id="gh-repo" value="kicksliygurulhg"></div>
+              <div class="fr"><label>Branch</label><input type="text" id="gh-branch" value="main"></div>
+              <div class="fr"><label>Commit Message</label><input type="text" id="gh-message" placeholder="[Admin] Update site data"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="ci">📝</span> Commit Summary</div>
+            <div id="commit-summary" style="font-size:11px;color:var(--muted2);font-family:var(--mono);line-height:2">
+              No files pending. Go to other tabs to make changes.
+            </div>
+          </div>
+          <button class="push-btn" id="push-btn" onclick="doPushAll()" disabled>🚀 PUSH TO GITHUB</button>
+          <div class="card">
+            <div class="card-title"><span class="ci">📜</span> Recent Commits</div>
+            <div class="commit-hist" id="commit-hist">
+              <span style="color:var(--muted2)">// Loading commit history...</span>
+            </div>
+            <button class="btn" style="margin-top:10px" onclick="loadCommitHistory()">↺ REFRESH HISTORY</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PANEL 7: DASHBOARD ═══ -->
+    <div class="panel" id="panel-dashboard">
+      <div class="pscroll">
+        <div class="dash-grid">
+          <div class="dash-card g">
+            <div class="dc-n" id="stat-designs">—</div>
+            <div class="dc-l">Total Designs</div>
+            <div class="dc-c" id="stat-designs-c"></div>
+          </div>
+          <div class="dash-card">
+            <div class="dc-n" id="stat-vip">—</div>
+            <div class="dc-l">VIP Members</div>
+            <div class="dc-c" id="stat-vip-c"></div>
+          </div>
+          <div class="dash-card b">
+            <div class="dc-n" id="stat-cats">—</div>
+            <div class="dc-l">Categories</div>
+          </div>
+          <div class="dash-card p">
+            <div class="dc-n" id="stat-price">—</div>
+            <div class="dc-l">Monthly Price</div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="card">
+            <div class="card-title"><span class="ci">📂</span> Category Breakdown</div>
+            <div id="cat-breakdown" style="font-size:11px;line-height:2.2;font-family:var(--mono)">Loading...</div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="ci">⚡</span> Quick Actions</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button class="btn primary" onclick="switchTab('proc')">📊 Process New Images</button>
+              <button class="btn success" onclick="switchTab('vip')">👑 Manage VIP Members</button>
+              <button class="btn warning" onclick="switchTab('settings')">⚙️ Site Settings</button>
+              <button class="btn blue" onclick="switchTab('ads')">📢 Update Ads</button>
+              <button class="btn" onclick="switchTab('github')">🚀 Push to GitHub</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="ci">🔧</span> System Status</div>
+            <div id="sys-status" style="font-size:11px;line-height:2.2;font-family:var(--mono);color:var(--muted2)">
+              <div>GitHub Token: <span id="ss-gh" class="badge">Checking...</span></div>
+              <div>Cloudinary: <span id="ss-cld" class="badge">Checking...</span></div>
+              <div>Groq API: <span id="ss-groq" class="badge">Checking...</span></div>
+              <div>Admin API: <span id="ss-api" class="badge">Checking...</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="ci">📋</span> Recent Activity</div>
+            <div id="recent-activity" style="font-size:10px;line-height:2;font-family:var(--mono);color:var(--muted2)">
+              No recent activity.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /ws -->
+</div><!-- /shell -->
+
+<!-- Excel Modal -->
+<div id="excel-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:500;align-items:flex-start;justify-content:center;padding:16px;overflow:auto">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-top:3px solid var(--green);width:100%;max-width:1300px;display:flex;flex-direction:column;max-height:calc(100vh - 32px)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--s2)">
+      <div style="font-size:18px;font-weight:700">Excel Data Table <span style="color:var(--green)">— designs.xlsx</span></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="excel-count" style="font-size:10px;color:var(--muted2);font-family:var(--mono)"></span>
+        <button class="tbtn" onclick="exportExcel()">⬇ EXPORT XLSX</button>
+        <button class="tbtn" onclick="document.getElementById('excel-modal').style.display='none'">✕ CLOSE</button>
+      </div>
+    </div>
+    <div style="flex:1;overflow:auto">
+      <table class="xt" id="full-table"><thead><tr id="full-table-head"></tr></thead><tbody id="full-table-body"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- Notifications -->
+<div id="notif"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CORE STATE
+// ═══════════════════════════════════════════════════════
+const API_URL = '/.netlify/functions/adminProcessor';
+let ADMIN_TOKEN = '';
+let pendingChanges = {}; // { filePath: { content, isBase64, description } }
+let vipEmails = [];
+let allDesigns = [];
+let dlLinks = {};
+let processingImages = [];
+let processedRows = [];
+let existingRows = [];
+let existingIds = new Set();
+let stopFlag = false;
+let bgrImages = [];
+let bgrResults = [];
+let siteConfig = {};
+let toggleState = { popup:true, maintenance:false, freeDL:false, newDesigns:true, bgremover:true };
+let adSlots = { popup:{img:'',url:'',enabled:true}, top:{img:'',url:'',enabled:true}, sidebar:{img:'',url:'',enabled:true}, footer:{img:'',url:'',enabled:true} };
+let ACTIVITY_LOG = [];
+
+// ═══════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════
+async function doLogin() {
+  const pw = document.getElementById('lpw').value.trim();
+  if (!pw) return;
+  try {
+    const r = await fetch('/.netlify/functions/adminAuth', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ password: pw })
+    });
+    const d = await r.json();
+    if (d.token) {
+      ADMIN_TOKEN = d.token;
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('shell').style.display = 'flex';
+      onPanelLoad('proc');
+      loadVipList();
+      loadCommitHistory();
+      checkSystemStatus();
+    } else {
+      document.getElementById('lerr').style.display = 'block';
+    }
+  } catch(e) {
+    // Fallback: use simple hash check for standalone mode
+    document.getElementById('lerr').style.display = 'block';
+    document.getElementById('lerr').textContent = '❌ Cannot connect to API. Check Netlify functions.';
+  }
+}
+document.getElementById('lpw').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+function doLogout() { ADMIN_TOKEN=''; document.getElementById('shell').style.display='none'; document.getElementById('login').style.display='flex'; document.getElementById('lpw').value=''; document.getElementById('lerr').style.display='none'; }
+
+// ═══════════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════════
+function switchTab(id) {
+  document.querySelectorAll('.navt').forEach(t => t.classList.remove('act'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('act'));
+  document.querySelector(`.navt[data-tab="${id}"]`)?.classList.add('act');
+  document.getElementById('panel-'+id)?.classList.add('act');
+  onPanelLoad(id);
+}
+function onPanelLoad(id) {
+  if (id === 'dashboard') loadDashboard();
+  if (id === 'vip') loadVipList();
+  if (id === 'ads') renderAdSlots();
+  if (id === 'settings') loadSettingsFromGithub();
+}
+
+// ═══════════════════════════════════════════════════════
+// API HELPER
+// ═══════════════════════════════════════════════════════
+async function api(action, extra={}) {
+  const r = await fetch(API_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ adminToken: ADMIN_TOKEN, action, ...extra })
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+  return d.result;
+}
+
+// ═══════════════════════════════════════════════════════
+// LOG
+// ═══════════════════════════════════════════════════════
+function log(msg, type='o') {
+  const box = document.getElementById('logbox');
+  const cls = {o:'lo',w:'lw',e:'le',d:'ld',v:'lv',b:'lb'}[type]||'ld';
+  const time = new Date().toLocaleTimeString('en-IN',{hour12:false});
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = `[${time}] ${msg}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+  ACTIVITY_LOG.unshift(`${time}: ${msg}`);
+  if (ACTIVITY_LOG.length > 50) ACTIVITY_LOG.pop();
+}
+function clearLog() { document.getElementById('logbox').innerHTML = '<span class="ld">// Log cleared.</span>'; }
+function exportLog() {
+  const text = Array.from(document.getElementById('logbox').children).map(l=>l.textContent).join('\n');
+  dlText(text,'admin-log.txt');
+}
+function notify(msg, type='ok') {
+  const n = document.getElementById('notif');
+  const el = document.createElement('div');
+  el.className = 'nf' + (type==='err'?' err':type==='warn'?' warn':'');
+  el.textContent = msg;
+  n.appendChild(el);
+  setTimeout(()=>el.remove(), 4000);
+}
+
+// ═══════════════════════════════════════════════════════
+// PROC TAB SWITCH
+// ═══════════════════════════════════════════════════════
+function switchProcTab(t) {
+  ['log','table','missing'].forEach(id => {
+    const tab = document.getElementById('ptab-'+id);
+    const view = document.getElementById('pview-'+id);
+    if (tab) tab.classList.remove('act');
+    if (view) { view.style.display='none'; if(view.style.flexDirection) view.style.display='none'; }
+  });
+  document.getElementById('ptab-'+t)?.classList.add('act');
+  const v = document.getElementById('pview-'+t);
+  if(v) { v.style.display='flex'; v.style.flexDirection='column'; }
+}
+
+// ═══════════════════════════════════════════════════════
+// STEP 1: FETCH DOWNLOAD LINKS
+// ═══════════════════════════════════════════════════════
+async function fetchDownloadLinks() {
+  const urls = document.getElementById('dl-urls').value.trim();
+  if (!urls) { notify('Enter MediaFire or Drive URLs first','warn'); return; }
+  const st = document.getElementById('dl-status');
+  st.textContent = '⏳ Fetching...';
+  log('Fetching download links from URLs...','b');
+  try {
+    if (urls.includes('mediafire.com')) {
+      const r = await api('mediafire', { urls });
+      dlLinks = { ...dlLinks, ...r };
+      st.textContent = `✅ ${Object.keys(r).length} MediaFire links found`;
+      log(`✅ MediaFire: ${Object.keys(r).length} files indexed`,'o');
+    }
+    if (urls.includes('drive.google.com')) {
+      const r = await api('gdrive', { urls });
+      dlLinks = { ...dlLinks, ...r };
+      st.textContent = `✅ ${Object.keys(r).length} Drive links found`;
+      log(`✅ Google Drive: ${Object.keys(r).length} files indexed`,'o');
+    }
+    const cldRes = await api('cloudinary');
+    dlLinks = { ...dlLinks, ...cldRes };
+    log(`✅ Cloudinary: ${Object.keys(cldRes).length} images indexed`,'o');
+    notify(`Loaded ${Object.keys(dlLinks).length} total links`);
+    document.getElementById('sn1').classList.remove('act');
+    document.getElementById('sn1').classList.add('done');
+    document.getElementById('sn1').textContent = '✓';
+    document.getElementById('sn2').classList.add('act');
+    checkRunReady();
+  } catch(e) {
+    st.textContent = '❌ '+e.message;
+    log('❌ '+e.message,'e');
+    notify(e.message,'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// STEP 2: HANDLE IMAGES
+// ═══════════════════════════════════════════════════════
+function handleImages(files) {
+  if (!files.length) return;
+  processingImages = Array.from(files);
+  const grid = document.getElementById('thumb-grid');
+  grid.innerHTML = '';
+  let newCount = 0, skipCount = 0;
+  processingImages.forEach(f => {
+    const id = cleanId(f.name);
+    const img = document.createElement('img');
+    img.className = 'timg';
+    img.title = id;
+    const url = URL.createObjectURL(f);
+    img.src = url;
+    if (existingIds.has(id.toLowerCase())) { img.classList.add('skip'); skipCount++; }
+    else { img.classList.add('new'); newCount++; }
+    grid.appendChild(img);
+  });
+  document.getElementById('stats-mini').style.display = 'grid';
+  document.getElementById('st-new').textContent = newCount;
+  document.getElementById('st-skip').textContent = skipCount;
+  document.getElementById('st-up').textContent = '0';
+  const dz = document.getElementById('dropzone');
+  dz.classList.add('ok');
+  dz.innerHTML = `<div style="font-size:22px">✅</div><div>${processingImages.length} images loaded</div><div style="font-size:10px;margin-top:3px">${newCount} new / ${skipCount} existing (skip)</div>`;
+  log(`📁 Loaded ${processingImages.length} images (${newCount} new, ${skipCount} skip)`,'o');
+  document.getElementById('sn2').classList.remove('act');
+  document.getElementById('sn2').classList.add('done');
+  document.getElementById('sn2').textContent = '✓';
+  document.getElementById('sn3').classList.add('act');
+  checkRunReady();
+}
+function cleanId(filename) {
+  return filename.replace(/\.[^.]+$/, '').trim();
+}
+function checkRunReady() {
+  const ready = processingImages.length > 0;
+  document.getElementById('run-btn').disabled = !ready;
+}
+
+// ═══════════════════════════════════════════════════════
+// LOAD EXISTING EXCEL
+// ═══════════════════════════════════════════════════════
+async function loadExcelPreview() {
+  log('Loading Excel from GitHub...','b');
+  try {
+    const r = await api('readXlsxGithub',{});
+    existingRows = r.rows || [];
+    existingIds = new Set(existingRows.map(x=>x.id?.toLowerCase()));
+    const tbody = document.getElementById('preview-tbody');
+    tbody.innerHTML = '';
+    existingRows.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.className = 'rold';
+      tr.innerHTML = `<td>${row.id}</td><td>${row.title||''}</td><td>${row.category||''}</td><td><span class="badge gold">Existing</span></td>`;
+      tbody.appendChild(tr);
+    });
+    log(`✅ Loaded ${existingRows.length} existing rows`,'o');
+    notify(`Loaded ${existingRows.length} existing designs`);
+  } catch(e) {
+    log('❌ '+e.message,'e');
+    notify(e.message,'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// MAIN PROCESSING
+// ═══════════════════════════════════════════════════════
+async function startProcessing() {
+  if (!processingImages.length) { notify('Upload images first','warn'); return; }
+  stopFlag = false;
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('stop-btn').style.display = 'block';
+  switchProcTab('log');
+  
+  const model = document.getElementById('groq-model').value;
+  const lang = document.getElementById('groq-lang').value;
+  const minWords = parseInt(document.getElementById('groq-words').value)||600;
+  
+  // Load existing data
+  if (!existingRows.length) {
+    log('Loading existing Excel from GitHub...','b');
+    try {
+      const r = await api('readXlsxGithub',{});
+      existingRows = r.rows || [];
+      existingIds = new Set(existingRows.map(x=>x.id?.toLowerCase()));
+      log(`Loaded ${existingRows.length} existing rows`,'d');
+    } catch(e) { log('Could not load existing Excel: '+e.message,'w'); }
+  }
+
+  const newImages = processingImages.filter(f => !existingIds.has(cleanId(f.name).toLowerCase()));
+  log(`Processing ${newImages.length} new images (${processingImages.length-newImages.length} skipped)`,'o');
+  
+  processedRows = [];
+  const fill = document.getElementById('progfill');
+  const pt = document.getElementById('progtext');
+  let groqCallIndex = 0;
+  let upCount = 0;
+
+  for (let i = 0; i < newImages.length; i++) {
+    if (stopFlag) { log('⏹ Stopped by user','w'); break; }
+    const f = newImages[i];
+    const id = cleanId(f.name);
+    const pct = Math.round(((i+1)/newImages.length)*100);
+    fill.style.width = pct+'%';
+    pt.textContent = `[${i+1}/${newImages.length}] Processing: ${id}`;
+    log(`\n── [${i+1}/${newImages.length}] ID: ${id}`,'v');
+
+    // Get image as data URL
+    const imageDataUrl = await fileToDataUrl(f);
+    let thumbUrl = '';
+
+    // Check if cloudinary URL exists
+    const cldKey = cleanKey(id);
+    thumbUrl = dlLinks[cldKey] || dlLinks[id.toLowerCase()] || '';
+
+    // If no cloudinary URL, ask to upload
+    if (!thumbUrl) {
+      log(`  ⚠️ No Cloudinary URL for "${id}" — uploading now...`,'w');
+      try {
+        const upRes = await api('uploadToCloudinary', { imageDataUrl, publicId: id });
+        thumbUrl = upRes.secure_url;
+        log(`  ✅ Uploaded to Cloudinary: ${thumbUrl.slice(-40)}`,'o');
+        upCount++;
+        document.getElementById('st-up').textContent = upCount;
+      } catch(e) {
+        log(`  ❌ Cloudinary upload failed: ${e.message}`,'e');
+        thumbUrl = '';
+      }
+    } else {
+      log(`  ✅ Cloudinary URL found: ${thumbUrl.slice(-40)}`,'o');
+    }
+
+    // Get download link
+    const dlUrl = dlLinks[cldKey] || dlLinks[id.toLowerCase()] || '';
+    log(`  📥 Download URL: ${dlUrl ? dlUrl.slice(-40) : 'MISSING'}`,'d');
+
+    // Generate SEO with Groq
+    log(`  🤖 Generating SEO content (${model}, ${lang}, ${minWords}w)...`,'b');
+    let seo = null;
+    try {
+      seo = await api('groqSeoVision', { id, imageUrl: thumbUrl, model, lang, minWords, groqCallIndex });
+      groqCallIndex++;
+      log(`  ✅ SEO: "${seo.title?.slice(0,50)}..."`,'o');
+    } catch(e) {
+      if (e.message.includes('429') || e.message.includes('quota')) {
+        log(`  ⚠️ Groq quota hit — switching key, retrying...`,'w');
+        groqCallIndex += 5;
+        try {
+          seo = await api('groqSeoVision', { id, imageUrl: thumbUrl, model, lang, minWords, groqCallIndex });
+          groqCallIndex++;
+        } catch(e2) { log(`  ❌ SEO generation failed: ${e2.message}`,'e'); }
+      } else {
+        log(`  ❌ SEO: ${e.message}`,'e');
+      }
+    }
+
+    if (!seo) seo = { title:`${id} PSD Free Download`, category:'general', tags:'tamil psd, free download', description:`PSD template: ${id}`, software:'Adobe Photoshop', fonts:'Latha' };
+
+    const newRow = {
+      id,
+      download_url: dlUrl,
+      title: seo.title||'',
+      category: seo.category||'general',
+      tags: seo.tags||'',
+      description: seo.description||'',
+      dimensions: '4x3 feet',
+      dpi: '300 DPI',
+      file_size: '',
+      color_mode: 'CMYK',
+      software: seo.software||'Adobe Photoshop CS6',
+      fonts: seo.fonts||'Latha',
+      preview_url: thumbUrl,
+    };
+    processedRows.push(newRow);
+
+    // Add to table preview
+    const tbody = document.getElementById('preview-tbody');
+    const tr = document.createElement('tr');
+    tr.className = 'rnew';
+    tr.innerHTML = `<td>${id}</td><td>${seo.title?.slice(0,40)||''}</td><td>${seo.category||''}</td><td><span class="badge green">New</span></td>`;
+    tbody.insertBefore(tr, tbody.firstChild);
+
+    await sleep(500);
+  }
+
+  pt.textContent = `✅ Done! ${processedRows.length} new rows generated.`;
+  log(`\n✅ Processing complete: ${processedRows.length} new rows`,'o');
+  notify(`Done! ${processedRows.length} new designs processed`);
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('stop-btn').style.display = 'none';
+
+  if (processedRows.length > 0) {
+    await saveExcelAndJson();
+  }
+}
+
+function stopProcessing() { stopFlag = true; }
+
+async function saveExcelAndJson() {
+  log('\n💾 Building Excel file...','b');
+  try {
+    const xlsxRes = await api('saveXlsx', { existingRows, newRows: processedRows });
+    log(`✅ Excel built: ${xlsxRes.totalRows} total rows`,'o');
+
+    // Convert to JSON
+    const allRows = [...existingRows, ...processedRows];
+    const jsonRes = await api('excelToJson', { rows: allRows });
+    log(`✅ JSON built: ${jsonRes.length} designs`,'o');
+
+    // Queue for push
+    pendingChanges['designs.xlsx'] = { content: xlsxRes.base64, isBase64: true, description: `Excel: +${processedRows.length} new rows` };
+    pendingChanges['data/designs.json'] = { content: JSON.stringify(jsonRes, null, 2), isBase64: false, description: `JSON: ${jsonRes.length} designs` };
+    
+    refreshPendingFiles();
+    log('📋 Files queued for GitHub push. Go to GitHub tab to push!','v');
+    notify('Excel & JSON ready! Go to GitHub tab to push 🚀');
+  } catch(e) {
+    log('❌ Save failed: '+e.message,'e');
+    notify(e.message,'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// FILL MISSING
+// ═══════════════════════════════════════════════════════
+async function scanMissing() {
+  log('Scanning for missing SEO data...','b');
+  try {
+    if (!existingRows.length) {
+      const r = await api('readXlsxGithub',{});
+      existingRows = r.rows||[];
+    }
+    const missing = existingRows.filter(r => !r.title || !r.description || !r.tags);
+    const cont = document.getElementById('missing-list');
+    if (!missing.length) {
+      cont.innerHTML = '<div style="color:var(--green);font-size:11px">✅ All rows have complete data!</div>';
+      document.getElementById('fill-btn').disabled = true;
+      return;
+    }
+    cont.innerHTML = `<div style="font-size:11px;color:var(--gold);margin-bottom:8px">⚠️ ${missing.length} rows have missing data:</div>` +
+      missing.slice(0,15).map(r=>`<div style="font-size:10px;font-family:var(--mono);color:var(--muted2);padding:3px 0;border-bottom:1px solid var(--border)">${r.id} — ${!r.title?'title ':''}${!r.description?'desc ':''}${!r.tags?'tags ':''}</div>`).join('') +
+      (missing.length>15?`<div style="font-size:10px;color:var(--muted);margin-top:4px">+${missing.length-15} more...</div>`:'');
+    document.getElementById('fill-btn').disabled = false;
+    log(`Found ${missing.length} rows with missing data`,'w');
+  } catch(e) { log('❌ '+e.message,'e'); }
+}
+
+async function fillAllMissing() {
+  if (!existingRows.length) return;
+  const model = document.getElementById('groq-model').value;
+  const lang = document.getElementById('groq-lang').value;
+  const missing = existingRows.filter(r => !r.title || !r.description || !r.tags);
+  log(`Filling ${missing.length} rows...`,'b');
+  document.getElementById('fill-btn').disabled = true;
+  let filled = 0;
+  for (const row of missing) {
+    if (stopFlag) break;
+    log(`  Filling: ${row.id}`,'d');
+    try {
+      const res = await api('fillMissing', { row, model, lang });
+      if (res.filled) {
+        const idx = existingRows.findIndex(r=>r.id===row.id);
+        if (idx>=0) existingRows[idx] = res.row;
+        filled++;
+        log(`  ✅ ${row.id}: "${res.row.title?.slice(0,40)}"`,'o');
+      }
+    } catch(e) { log(`  ❌ ${row.id}: ${e.message}`,'e'); }
+    await sleep(600);
+  }
+  log(`✅ Filled ${filled}/${missing.length} rows`,'o');
+  notify(`Filled ${filled} rows`);
+  if (filled>0) await saveExcelAndJson();
+}
+
+// ═══════════════════════════════════════════════════════
+// VIP EMAILS
+// ═══════════════════════════════════════════════════════
+async function loadVipList() {
+  try {
+    const r = await api('readGithubFile', { path:'data/vip.json' });
+    const data = JSON.parse(r.content);
+    vipEmails = data.emails || data.v || [];
+    // Try to load plain emails from vip-emails.txt
+    try {
+      const r2 = await api('readGithubFile', { path:'vip-emails.txt' });
+      const lines = r2.content.split('\n').map(l=>l.trim()).filter(l=>l&&l.includes('@'));
+      if (lines.length) vipEmails = lines;
+    } catch(e2) {}
+    renderVipList(vipEmails);
+  } catch(e) {
+    // File not found, empty list
+    vipEmails = [];
+    renderVipList([]);
+    log('VIP list: empty or not found','d');
+  }
+}
+
+function renderVipList(emails) {
+  const list = document.getElementById('vip-list');
+  document.getElementById('vip-count-display').textContent = emails.length;
+  document.getElementById('vip-count-badge').textContent = emails.length;
+  if (!emails.length) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:11px">No VIP members yet.</div>';
+    return;
+  }
+  list.innerHTML = emails.map((e,i) => `
+    <div class="vip-item">
+      <span style="font-size:9px;color:var(--muted2);font-family:var(--mono);width:24px">${i+1}</span>
+      <span class="ve">${e}</span>
+      <button class="vd" onclick="removeVip(${i})" title="Remove">×</button>
+    </div>`).join('');
+}
+
+function addVipSingle() {
+  const email = document.getElementById('vip-email-input').value.trim().toLowerCase();
+  if (!email || !email.includes('@')) { notify('Enter valid email','warn'); return; }
+  if (vipEmails.includes(email)) { notify('Email already in VIP list','warn'); return; }
+  vipEmails.push(email);
+  renderVipList(vipEmails);
+  document.getElementById('vip-email-input').value = '';
+  queueVipSave();
+  notify(`Added: ${email}`);
+  log(`Added VIP: ${email}`,'o');
+}
+
+function addVipBulk() {
+  const raw = document.getElementById('bulk-vip').value;
+  const emails = raw.split(/[\n,;]+/).map(e=>e.trim().toLowerCase()).filter(e=>e.includes('@'));
+  let added = 0;
+  emails.forEach(e => { if (!vipEmails.includes(e)) { vipEmails.push(e); added++; } });
+  renderVipList(vipEmails);
+  document.getElementById('bulk-vip').value = '';
+  if (added) { queueVipSave(); notify(`Added ${added} emails`); log(`Bulk added ${added} VIP emails`,'o'); }
+  else notify('No new emails to add','warn');
+}
+
+function removeVip(i) {
+  const e = vipEmails[i];
+  vipEmails.splice(i, 1);
+  renderVipList(vipEmails);
+  queueVipSave();
+  notify(`Removed: ${e}`,'warn');
+}
+
+function clearAllVip() {
+  if (!confirm('Clear ALL VIP emails?')) return;
+  vipEmails = [];
+  renderVipList([]);
+  queueVipSave();
+  notify('All VIP emails cleared','warn');
+}
+
+function searchVip(q) {
+  const filtered = vipEmails.filter(e=>e.toLowerCase().includes(q.toLowerCase()));
+  renderVipList(q ? filtered : vipEmails);
+}
+
+function exportVipList() {
+  dlText(vipEmails.join('\n'), 'vip-emails.csv');
+}
+
+function queueVipSave() {
+  // SHA-256 hash of emails for vip.json
+  const plainTxt = vipEmails.join('\n');
+  pendingChanges['vip-emails.txt'] = { content: plainTxt, isBase64: false, description: `VIP: ${vipEmails.length} emails` };
+  refreshPendingFiles();
+}
+
+function prepareVipPush() {
+  if (Object.keys(pendingChanges).length > 0) {
+    document.getElementById('push-btn').disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════
+async function loadSettingsFromGithub() {
+  try {
+    const r = await api('readGithubFile', { path:'data/site-config.json' });
+    siteConfig = JSON.parse(r.content);
+    // Populate fields
+    if (siteConfig.price) {
+      document.getElementById('price-monthly').value = siteConfig.price.monthly || '';
+      document.getElementById('price-annual').value = siteConfig.price.annual || '';
+      document.getElementById('price-label').value = siteConfig.price.label || '';
+      document.getElementById('price-display-val').textContent = siteConfig.price.monthly || '99';
+    }
+    if (siteConfig.site) {
+      document.getElementById('cfg-title').value = siteConfig.site.title||'';
+      document.getElementById('cfg-desc').value = siteConfig.site.description||'';
+      document.getElementById('cfg-email').value = siteConfig.site.email||'';
+      document.getElementById('cfg-wa').value = siteConfig.site.whatsapp||'';
+    }
+    if (siteConfig.social) {
+      document.getElementById('soc-yt').value = siteConfig.social.youtube||'';
+      document.getElementById('soc-tg').value = siteConfig.social.telegram||'';
+      document.getElementById('soc-ig').value = siteConfig.social.instagram||'';
+      document.getElementById('soc-fb').value = siteConfig.social.facebook||'';
+    }
+    if (siteConfig.toggles) {
+      toggleState = { ...toggleState, ...siteConfig.toggles };
+      renderToggles();
+    }
+    if (siteConfig.hero) {
+      document.getElementById('hero-title').value = siteConfig.hero.title||'';
+      document.getElementById('hero-subtitle').value = siteConfig.hero.subtitle||'';
+      document.getElementById('hero-cta').value = siteConfig.hero.cta||'';
+    }
+    if (siteConfig.ads) adSlots = { ...adSlots, ...siteConfig.ads };
+    log('Settings loaded from GitHub','d');
+  } catch(e) {
+    log('Using default settings (config not found)','d');
+  }
+}
+
+function renderToggles() {
+  Object.keys(toggleState).forEach(k => {
+    const row = document.getElementById('tog-'+k);
+    const tog = document.getElementById('tog-'+k+'-tog');
+    if (!row || !tog) return;
+    if (toggleState[k]) { row.classList.add('on'); tog.classList.add('on'); }
+    else { row.classList.remove('on'); tog.classList.remove('on'); }
+  });
+}
+
+function toggleFeature(k) {
+  toggleState[k] = !toggleState[k];
+  renderToggles();
+}
+
+function previewHero(input) {
+  if (!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const p = document.getElementById('hero-preview');
+    p.src = e.target.result;
+    p.classList.add('show');
+    document.getElementById('hero-dropzone').querySelector('.icon').style.display='none';
+    pendingChanges['images/hero-bg.jpg'] = { content: e.target.result.split(',')[1], isBase64: true, description: 'Hero background image' };
+    refreshPendingFiles();
+    notify('Hero BG staged for push');
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function saveHeroBg() {
+  if (!pendingChanges['images/hero-bg.jpg']) { notify('Upload an image first','warn'); return; }
+  notify('Hero BG queued — push from GitHub tab');
+  switchTab('github');
+}
+
+function resetHeroBg() {
+  document.getElementById('hero-preview').classList.remove('show');
+  document.getElementById('hero-dropzone').querySelector('.icon').style.display='';
+  delete pendingChanges['images/hero-bg.jpg'];
+  refreshPendingFiles();
+}
+
+function savePricing() {
+  siteConfig.price = {
+    monthly: document.getElementById('price-monthly').value,
+    annual: document.getElementById('price-annual').value,
+    label: document.getElementById('price-label').value
+  };
+  document.getElementById('price-display-val').textContent = siteConfig.price.monthly || '99';
+  queueConfigSave('Pricing updated');
+}
+
+function saveSiteConfig() {
+  siteConfig.site = {
+    title: document.getElementById('cfg-title').value,
+    description: document.getElementById('cfg-desc').value,
+    email: document.getElementById('cfg-email').value,
+    whatsapp: document.getElementById('cfg-wa').value
+  };
+  queueConfigSave('Site config saved');
+}
+
+function saveSocials() {
+  siteConfig.social = {
+    youtube: document.getElementById('soc-yt').value,
+    telegram: document.getElementById('soc-tg').value,
+    instagram: document.getElementById('soc-ig').value,
+    facebook: document.getElementById('soc-fb').value
+  };
+  queueConfigSave('Social links saved');
+}
+
+function saveHeroText() {
+  siteConfig.hero = {
+    title: document.getElementById('hero-title').value,
+    subtitle: document.getElementById('hero-subtitle').value,
+    cta: document.getElementById('hero-cta').value
+  };
+  queueConfigSave('Hero text saved');
+}
+
+function saveToggles() {
+  siteConfig.toggles = { ...toggleState };
+  queueConfigSave('Toggles saved');
+}
+
+function queueConfigSave(msg) {
+  pendingChanges['data/site-config.json'] = {
+    content: JSON.stringify(siteConfig, null, 2),
+    isBase64: false,
+    description: 'Site configuration'
+  };
+  refreshPendingFiles();
+  notify(msg + ' — push from GitHub tab');
+  log(msg,'o');
+}
+
+// ═══════════════════════════════════════════════════════
+// ADS
+// ═══════════════════════════════════════════════════════
+const AD_DEFS = [
+  { id:'popup', name:'Popup Ad', type:'Popup on load', w:500, h:500 },
+  { id:'top', name:'Top Banner', type:'Top of page', w:728, h:90 },
+  { id:'sidebar', name:'Sidebar Ad', type:'Right sidebar', w:300, h:250 },
+  { id:'footer', name:'Footer Banner', type:'Bottom of page', w:728, h:90 },
+];
+
+function renderAdSlots() {
+  const grid = document.getElementById('ads-grid');
+  grid.innerHTML = AD_DEFS.map(ad => `
+    <div class="ad-card">
+      <div class="ad-head">
+        <div class="ad-name">${ad.name}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="ad-type">${ad.w}×${ad.h}px</span>
+          <div class="toggle-row on" style="border:none;padding:0;background:transparent;margin-bottom:0" id="adtog-row-${ad.id}" onclick="toggleAd('${ad.id}')">
+            <div class="tog on" id="adtog-${ad.id}"></div>
+          </div>
+        </div>
+      </div>
+      <div class="ad-body">
+        <div class="ad-preview" id="adprev-${ad.id}" onclick="document.getElementById('adfile-${ad.id}').click()">
+          ${adSlots[ad.id]?.img ? `<img src="${adSlots[ad.id].img}" id="adimg-${ad.id}">` : `<span>Click to upload ad image</span>`}
+          <div class="ap-overlay"><span style="font-size:11px">📁 Change Image</span></div>
+        </div>
+        <input type="file" id="adfile-${ad.id}" accept="image/*" style="display:none" onchange="loadAdImage('${ad.id}',this)">
+        <div class="fr" style="margin-bottom:8px">
+          <label>Click URL</label>
+          <input type="url" id="adurl-${ad.id}" value="${adSlots[ad.id]?.url||''}" placeholder="https://..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:11px;outline:none;width:100%">
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function toggleAd(id) {
+  adSlots[id] = adSlots[id]||{};
+  adSlots[id].enabled = !adSlots[id].enabled;
+  const tog = document.getElementById('adtog-'+id);
+  if (tog) tog.classList.toggle('on', !!adSlots[id].enabled);
+}
+
+function loadAdImage(id, input) {
+  if (!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    adSlots[id] = adSlots[id]||{};
+    adSlots[id].img = e.target.result;
+    const prev = document.getElementById('adprev-'+id);
+    prev.innerHTML = `<img src="${e.target.result}" id="adimg-${id}"><div class="ap-overlay"><span style="font-size:11px">📁 Change</span></div>`;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function saveAllAds() {
+  AD_DEFS.forEach(ad => { if (document.getElementById('adurl-'+ad.id)) adSlots[ad.id] = { ...adSlots[ad.id], url: document.getElementById('adurl-'+ad.id).value }; });
+  siteConfig.ads = adSlots;
+  // Save ad images to ads/ folder
+  AD_DEFS.forEach(ad => {
+    if (adSlots[ad.id]?.img?.startsWith('data:')) {
+      const b64 = adSlots[ad.id].img.split(',')[1];
+      const ext = adSlots[ad.id].img.split(';')[0].split('/')[1]||'jpg';
+      pendingChanges[`ads/${ad.id}/ad.${ext}`] = { content: b64, isBase64: true, description: `Ad: ${ad.name}` };
+    }
+  });
+  queueConfigSave('Ads saved');
+}
+
+// ═══════════════════════════════════════════════════════
+// GITHUB PUSH
+// ═══════════════════════════════════════════════════════
+function refreshPendingFiles() {
+  const list = document.getElementById('gh-pending-list');
+  const keys = Object.keys(pendingChanges);
+  if (!keys.length) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:11px">No pending changes.</div>';
+    document.getElementById('push-btn').disabled = true;
+    document.getElementById('commit-summary').textContent = 'No files pending.';
+    return;
+  }
+  list.innerHTML = keys.map(k => `
+    <div class="gh-file sel">
+      <div><div class="gh-fp">${k}</div><div class="gh-ft">${pendingChanges[k].description||''}</div></div>
+      <button style="background:transparent;border:none;color:var(--accent);cursor:pointer;font-size:16px" onclick="removePending('${k}')" title="Remove">×</button>
+    </div>`).join('');
+  document.getElementById('push-btn').disabled = false;
+  document.getElementById('commit-summary').innerHTML = keys.map(k=>`<div style="color:var(--accent2)">📝 ${k} <span style="color:var(--muted2)">— ${pendingChanges[k].description||''}</span></div>`).join('');
+}
+
+function removePending(k) { delete pendingChanges[k]; refreshPendingFiles(); }
+
+async function doPushAll() {
+  const keys = Object.keys(pendingChanges);
+  if (!keys.length) { notify('Nothing to push','warn'); return; }
+  
+  const owner = document.getElementById('gh-owner').value;
+  const repo = document.getElementById('gh-repo').value;
+  const branch = document.getElementById('gh-branch').value;
+  const message = document.getElementById('gh-message').value || `[Admin] Update ${keys.length} files`;
+
+  document.getElementById('push-btn').disabled = true;
+  document.getElementById('push-btn').textContent = '⏳ PUSHING...';
+  log(`\n🚀 Pushing ${keys.length} files to ${owner}/${repo}:${branch}...`,'b');
+
+  let pushed = 0, failed = 0;
+  for (const filePath of keys) {
+    const { content, isBase64, description } = pendingChanges[filePath];
+    log(`  → ${filePath} (${description})...`,'d');
+    try {
+      const r = await api('githubPush', { owner, repo, branch, path: filePath, content, message, isBase64 });
+      log(`  ✅ Pushed: ${filePath} (commit: ${r.sha?.slice(0,8)||'?'})`,'o');
+      pushed++;
+      const el = document.querySelector(`.gh-file .gh-fp`);
+      if (el && el.textContent===filePath) el.closest('.gh-file')?.classList.add('pushed');
+    } catch(e) {
+      log(`  ❌ Failed: ${filePath} — ${e.message}`,'e');
+      failed++;
+    }
+    await sleep(300);
+  }
+
+  log(`\n✅ Push complete: ${pushed} ok, ${failed} failed`,'o');
+  notify(`Pushed ${pushed}/${keys.length} files 🚀`);
+  
+  if (pushed > 0) {
+    // Clear pushed files
+    Object.keys(pendingChanges).forEach(k => {
+      if (!document.querySelector(`.gh-file.sel .gh-fp`)?.textContent.includes(k)){}
+    });
+    pendingChanges = {};
+    refreshPendingFiles();
+    loadCommitHistory();
+  }
+  
+  document.getElementById('push-btn').disabled = false;
+  document.getElementById('push-btn').textContent = '🚀 PUSH TO GITHUB';
+}
+
+async function loadCommitHistory() {
+  const hist = document.getElementById('commit-hist');
+  const owner = document.getElementById('gh-owner')?.value || 'moorthiguru33';
+  const repo = document.getElementById('gh-repo')?.value || 'kicksliygurulhg';
+  try {
+    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=10`, {
+      headers:{ Authorization: `Bearer ${ADMIN_TOKEN}`, 'User-Agent':'TamilPSD-Admin' }
+    });
+    if (!r.ok) { hist.innerHTML = '<span style="color:var(--muted2)">// Could not load commits</span>'; return; }
+    const commits = await r.json();
+    hist.innerHTML = commits.map(c => 
+      `<div class="ch-line"><span class="ch-sha">${c.sha.slice(0,7)}</span> <span class="ch-msg">${c.commit.message.slice(0,50)}</span> <span class="ch-time">— ${new Date(c.commit.author.date).toLocaleDateString()}</span></div>`
+    ).join('');
+  } catch(e) {
+    hist.innerHTML = '<span style="color:var(--muted2)">// Could not load commits</span>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// BACKGROUND REMOVER (using @imgly/background-removal)
+// ═══════════════════════════════════════════════════════
+let bgrModule = null;
+let bgrInitialized = false;
+
+async function initBgr() {
+  if (bgrInitialized) return true;
+  const prog = document.getElementById('bgr-progress');
+  const pf = document.getElementById('bgr-pf');
+  const pt = document.getElementById('bgr-pt');
+  prog.classList.add('show');
+  pt.textContent = 'Loading background removal model...';
+  pf.style.width = '10%';
+  try {
+    // Use CDN version
+    if (!window.bgrLib) {
+      await loadScript('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/browser/index.mjs', true);
+    }
+    pf.style.width = '100%';
+    pt.textContent = 'Model ready!';
+    bgrInitialized = true;
+    setTimeout(()=>prog.classList.remove('show'), 1500);
+    return true;
+  } catch(e) {
+    pt.textContent = '❌ Failed to load model: '+e.message;
+    log('BG Remover: '+e.message,'e');
+    return false;
+  }
+}
+
+function loadScript(src, isModule) {
+  return new Promise((res,rej)=>{
+    const s = document.createElement('script');
+    s.src = src;
+    if (isModule) s.type = 'module';
+    s.onload = res;
+    s.onerror = ()=>rej(new Error('Script load failed: '+src));
+    document.head.appendChild(s);
+  });
+}
+
+function handleBgrImages(files) {
+  bgrImages = Array.from(files);
+  bgrResults = new Array(bgrImages.length).fill(null);
+  const list = document.getElementById('batch-list');
+  list.innerHTML = bgrImages.map((f,i) => `
+    <div class="batch-item" id="bi-${i}">
+      <img class="bi-thumb" src="${URL.createObjectURL(f)}">
+      <div class="bi-name">${f.name}</div>
+      <div class="bi-status wait" id="bi-st-${i}">WAIT</div>
+    </div>`).join('');
+  document.getElementById('bgr-run-btn').disabled = false;
+  log(`${bgrImages.length} images loaded for BG removal`,'o');
+}
+
+async function runBatchBgr() {
+  if (!bgrImages.length) return;
+  document.getElementById('bgr-run-btn').disabled = true;
+  const prog = document.getElementById('bgr-progress');
+  const pf = document.getElementById('bgr-pf');
+  const pt = document.getElementById('bgr-pt');
+  prog.classList.add('show');
+  
+  for (let i = 0; i < bgrImages.length; i++) {
+    const f = bgrImages[i];
+    const stEl = document.getElementById('bi-st-'+i);
+    if (stEl) { stEl.className='bi-status proc'; stEl.textContent='PROCESSING'; }
+    pf.style.width = Math.round(((i+1)/bgrImages.length)*100)+'%';
+    pt.textContent = `[${i+1}/${bgrImages.length}] ${f.name}`;
+    try {
+      const result = await removeBgFromFile(f);
+      bgrResults[i] = result;
+      if (stEl) { stEl.className='bi-status done'; stEl.textContent='DONE'; }
+      // Update thumb
+      const thumb = document.querySelector(`#bi-${i} .bi-thumb`);
+      if (thumb) thumb.src = URL.createObjectURL(result);
+      log(`✅ BG removed: ${f.name}`,'o');
+    } catch(e) {
+      if (stEl) { stEl.className='bi-status err'; stEl.textContent='ERR'; }
+      log(`❌ BG removal failed: ${f.name} — ${e.message}`,'e');
+    }
+  }
+  pf.style.width = '100%';
+  pt.textContent = 'Batch complete!';
+  setTimeout(()=>prog.classList.remove('show'), 2000);
+  document.getElementById('bgr-dl-btn').disabled = false;
+  notify('Batch BG removal complete!');
+}
+
+async function removeBgFromFile(file) {
+  // Use @imgly/background-removal via CDN
+  const imgUrl = URL.createObjectURL(file);
+  if (typeof window.removeBackground !== 'undefined') {
+    const blob = await window.removeBackground(imgUrl, {
+      progress: (k,cur,total) => {},
+      publicPath: 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/browser/',
+    });
+    URL.revokeObjectURL(imgUrl);
+    return blob;
+  }
+  // Fallback: use canvas edge detection
+  return await simpleEdgeBgRemove(file);
+}
+
+async function simpleEdgeBgRemove(file) {
+  return new Promise((res,rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width; canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const data = ctx.getImageData(0,0,canvas.width,canvas.height);
+      // Simple corner color removal
+      const r0=data.data[0],g0=data.data[1],b0=data.data[2];
+      const tol=30;
+      for (let i=0;i<data.data.length;i+=4) {
+        const r=data.data[i],g=data.data[i+1],b=data.data[i+2];
+        if (Math.abs(r-r0)<tol&&Math.abs(g-g0)<tol&&Math.abs(b-b0)<tol) data.data[i+3]=0;
+      }
+      ctx.putImageData(data,0,0);
+      canvas.toBlob(blob=>res(blob),'image/png');
+    };
+    img.onerror = ()=>rej(new Error('Image load failed'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function removeSingleBg(file) {
+  if (!file) return;
+  const prog = document.getElementById('bgr-progress');
+  const pf = document.getElementById('bgr-pf');
+  const pt = document.getElementById('bgr-pt');
+  prog.classList.add('show');
+  pt.textContent = `Processing: ${file.name}`;
+  pf.style.width = '50%';
+  try {
+    const result = await removeBgFromFile(file);
+    pf.style.width = '100%';
+    pt.textContent = 'Done!';
+    setTimeout(()=>prog.classList.remove('show'), 1500);
+    // Show on canvas
+    const canvas = document.getElementById('bgr-canvas');
+    const placeholder = document.getElementById('bgr-placeholder');
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width; canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img,0,0);
+      canvas.style.display = 'block';
+      if (placeholder) placeholder.style.display='none';
+    };
+    img.src = URL.createObjectURL(result);
+    window._bgrCurrentResult = result;
+    document.getElementById('bgr-save-btn').disabled = false;
+    notify('BG removed! Click Save PNG.');
+    log(`✅ BG removed: ${file.name}`,'o');
+  } catch(e) {
+    pt.textContent = '❌ '+e.message;
+    log('❌ BG removal: '+e.message,'e');
+    notify(e.message,'err');
+  }
+}
+
+function saveBgrResult() {
+  if (!window._bgrCurrentResult) return;
+  const url = URL.createObjectURL(window._bgrCurrentResult);
+  const a = document.createElement('a'); a.href=url; a.download='removed-bg.png'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+function downloadAllBgr() {
+  bgrResults.forEach((blob,i) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = bgrImages[i].name.replace(/\.[^.]+$/,'')+'-nobg.png';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 500*(i+1));
+  });
+}
+
+function clearBgrCanvas() {
+  const canvas = document.getElementById('bgr-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  canvas.style.display='none';
+  document.getElementById('bgr-placeholder').style.display='';
+  document.getElementById('bgr-save-btn').disabled = true;
+  window._bgrCurrentResult = null;
+}
+
+// ═══════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════
+async function loadDashboard() {
+  // Load designs count
+  try {
+    const r = await api('readGithubFile', { path:'data/designs.json' });
+    const designs = JSON.parse(r.content);
+    allDesigns = designs;
+    document.getElementById('stat-designs').textContent = designs.length;
+    document.getElementById('stat-designs-c').textContent = '+' + processedRows.length + ' today';
+    // Category breakdown
+    const cats = {};
+    designs.forEach(d => { cats[d.category||'other'] = (cats[d.category||'other']||0)+1; });
+    const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+    document.getElementById('cat-breakdown').innerHTML = sorted.map(([cat,count]) =>
+      `<div><span style="color:var(--accent2)">${cat}</span>: <span style="color:var(--text)">${count}</span></div>`
+    ).join('');
+    document.getElementById('stat-cats').textContent = Object.keys(cats).length;
+  } catch(e) {}
+  document.getElementById('stat-vip').textContent = vipEmails.length;
+  document.getElementById('stat-price').textContent = '₹'+(siteConfig.price?.monthly||'99');
+  // Recent activity
+  document.getElementById('recent-activity').innerHTML = ACTIVITY_LOG.slice(0,8).map(l=>`<div>${l}</div>`).join('') || 'No activity yet.';
+}
+
+async function checkSystemStatus() {
+  const s = async (id, fn) => {
+    try { await fn(); document.getElementById(id).className='badge green'; document.getElementById(id).textContent='✓ OK'; }
+    catch(e) { document.getElementById(id).className='badge red'; document.getElementById(id).textContent='✗ Error'; }
+  };
+  try {
+    const r = await api('listGithubFiles', { path:'' });
+    document.getElementById('ss-gh').className='badge green'; document.getElementById('ss-gh').textContent='✓ Connected';
+    document.getElementById('ss-api').className='badge green'; document.getElementById('ss-api').textContent='✓ Running';
+  } catch(e) {
+    document.getElementById('ss-gh').className='badge red'; document.getElementById('ss-gh').textContent='✗ Error';
+  }
+  document.getElementById('ss-cld').className='badge gold'; document.getElementById('ss-cld').textContent='Not checked';
+  document.getElementById('ss-groq').className='badge gold'; document.getElementById('ss-groq').textContent='Not checked';
+}
+
+// ═══════════════════════════════════════════════════════
+// EXCEL MODAL
+// ═══════════════════════════════════════════════════════
+async function openExcelModal() {
+  document.getElementById('excel-modal').style.display = 'flex';
+  const thead = document.getElementById('full-table-head');
+  const tbody = document.getElementById('full-table-body');
+  const cols = ['ID','Title','Category','Tags','Dimensions','DPI','Download URL','Preview URL'];
+  thead.innerHTML = cols.map(c=>`<th>${c}</th>`).join('');
+  const rows = [...existingRows, ...processedRows];
+  document.getElementById('excel-count').textContent = `${rows.length} rows`;
+  tbody.innerHTML = rows.map((r,i) => `
+    <tr class="${processedRows.includes(r)?'rnew':'rold'}">
+      <td>${r.id}</td>
+      <td>${(r.title||'').slice(0,45)}</td>
+      <td>${r.category||''}</td>
+      <td>${(r.tags||'').slice(0,40)}</td>
+      <td>${r.dimensions||''}</td>
+      <td>${r.dpi||''}</td>
+      <td style="color:var(--blue)">${(r.download_url||'').slice(0,45)}</td>
+      <td style="color:var(--muted2)">${(r.preview_url||'').slice(0,45)}</td>
+    </tr>`).join('');
+}
+
+function exportExcel() {
+  // Basic CSV export
+  const rows = [...existingRows, ...processedRows];
+  const cols = ['id','title','category','tags','description','dimensions','dpi','download_url','preview_url','software','fonts'];
+  const csv = [cols.join(','),...rows.map(r=>cols.map(c=>`"${(r[c]||'').replace(/"/g,'""')}"`).join(','))].join('\n');
+  dlText(csv,'designs.csv');
+}
+
+// ═══════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════
+function cleanKey(name) {
+  let s = String(name||'').trim();
+  s = s.replace(/(\s+copy\s*\d*)+\s*$/i,'').trim();
+  s = s.replace(/[()[\]{}]/g,' ');
+  s = s.replace(/([A-Za-z])(\d)/g,'$1 $2').replace(/(\d)([A-Za-z])/g,'$1 $2');
+  s = s.toLowerCase().trim();
+  s = s.replace(/[\s_.\-]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
+  return s;
+}
+
+function fileToDataUrl(file) {
+  return new Promise((res,rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = ()=>rej(new Error('File read failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+function dlText(text, filename) {
+  const a = document.createElement('a');
+  a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+  a.download = filename;
+  a.click();
+}
+
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+
+// Drag & drop
+document.getElementById('dropzone').addEventListener('dragover', e => { e.preventDefault(); });
+document.getElementById('dropzone').addEventListener('drop', e => { e.preventDefault(); handleImages(e.dataTransfer.files); });
+
+// Init
+log('Admin Panel v6 ready. Awaiting login...','d');
+</script>
+</body>
+</html>

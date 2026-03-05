@@ -1,0 +1,9 @@
+{
+  "name": "tamilpsd-admin-functions",
+  "version": "6.0.0",
+  "description": "TamilPSD Admin Panel Netlify Functions",
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "xlsx": "^0.18.5"
+  }
+}
